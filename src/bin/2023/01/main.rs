@@ -1,8 +1,6 @@
 extern crate lib;
 
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-
+use lib::reader::read_lines;
 use lib::trie::Trie;
 
 fn build_trie(words: Vec<(String, i64)>) -> Trie {
@@ -11,12 +9,6 @@ fn build_trie(words: Vec<(String, i64)>) -> Trie {
         trie.insert(word, value);
     }
     return trie;
-}
-
-fn get_lines() -> impl Iterator<Item = String> {
-    let handler = File::open("data/2023/01/input.txt").unwrap();
-    let reader = BufReader::new(handler);
-    return reader.lines().map(|l| l.unwrap());
 }
 
 fn search_digits(trie: &Trie, char_vec: &Vec<char>, pos: usize) -> Option<i64> {
@@ -70,7 +62,7 @@ fn get_digits(trie: &Trie, line: String) -> (i64, i64) {
 fn get_value(words: Vec<(String, i64)>) -> i64 {
     let mut total: i64 = 0;
     let trie = build_trie(words);
-    for line in get_lines() {
+    for line in read_lines("data/2023/01/input.txt") {
         let (first_digit, second_digit) = get_digits(&trie, line);
         total += first_digit * 10 + second_digit;
     }
