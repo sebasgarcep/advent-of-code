@@ -15,3 +15,7 @@ path = "src/lib/mod.rs"
 [[bin]]
 name = "2023-01"
 path = "src/bin/2023/01/main.rs"
+
+[[bin]]
+name = "2023-02"
+path = "src/bin/2023/02/main.rs"
