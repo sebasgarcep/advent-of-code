@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+itertools = "0.12.0"
 lazy_static = "1.4.0"
 
 [lib]
@@ -19,3 +20,7 @@ path = "src/bin/2023/01/main.rs"
 [[bin]]
 name = "2023-02"
 path = "src/bin/2023/02/main.rs"
+
+[[bin]]
+name = "2023-03"
+path = "src/bin/2023/03/main.rs"
