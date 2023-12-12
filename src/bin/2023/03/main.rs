@@ -27,14 +27,14 @@ fn main() {
             curr_number = curr_number * 10 + parse_ascii_digit(curr_char);
 
             if let Some(ref prev_line) = maybe_prev_line {
-                curr_should_count = curr_should_count || should_count_line(prev_line, pos, true);
+                curr_should_count = curr_should_count || should_count_line(prev_line, pos);
             }
 
             if let Some(ref next_line) = maybe_next_line {
-                curr_should_count = curr_should_count || should_count_line(next_line, pos, true);
+                curr_should_count = curr_should_count || should_count_line(next_line, pos);
             }
 
-            curr_should_count = curr_should_count || should_count_line(&curr_line, pos, false);
+            curr_should_count = curr_should_count || should_count_line(&curr_line, pos);
         }
 
         if curr_should_count {
@@ -47,21 +47,18 @@ fn main() {
     println!("{}", total);
 }
 
-fn should_count_line(line: &str, position: usize, count_digits: bool) -> bool {
-    return should_count(get_char_at_position(&line, position), count_digits)
-        || (position > 0 && should_count(get_char_at_position(&line, position - 1), count_digits))
+fn should_count_line(line: &str, position: usize) -> bool {
+    return should_count(get_char_at_position(&line, position))
+        || (position > 0 && should_count(get_char_at_position(&line, position - 1)))
         || (position < line.len() - 1
-            && should_count(get_char_at_position(&line, position + 1), count_digits));
+            && should_count(get_char_at_position(&line, position + 1)));
 }
 
 fn get_char_at_position(line: &str, position: usize) -> char {
     return line.as_bytes()[position] as char;
 }
 
-fn should_count(char: char, count_digits: bool) -> bool {
-    if count_digits {
-        return char != '.';
-    }
+fn should_count(char: char) -> bool {
     return !char.is_ascii_digit() && char != '.';
 }
 
