@@ -32,3 +32,7 @@ path = "src/bin/2023/04/main.rs"
 [[bin]]
 name = "2023-05"
 path = "src/bin/2023/05/main.rs"
+
+[[bin]]
+name = "2023-06"
+path = "src/bin/2023/06/main.rs"
