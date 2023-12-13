@@ -61,7 +61,7 @@ fn second() {
         .chunks(2)
         .map(|chunk| {
             return match chunk {
-                &[a, b] => (a, b - 1),
+                &[a, b] => (a, a + b - 1),
                 _ => unreachable!(),
             };
         })
