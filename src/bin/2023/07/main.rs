@@ -4,7 +4,7 @@ use lib::reader::read_lines;
 
 pub fn main() {
     first();
-    // second();
+    second();
 }
 
 trait Sorter {
@@ -88,6 +88,53 @@ impl Sorter for FirstSorter {
 
 fn first() {
     let sorter = FirstSorter::new();
+    solve(&sorter);
+}
+
+struct SecondSorter {}
+
+impl SecondSorter {
+    pub fn new() -> Self {
+        return Self {};
+    }
+}
+
+impl Sorter for SecondSorter {
+    fn get_value_of_hand(&self, hand: &Vec<char>) -> i64 {
+        todo!()
+    }
+
+    fn get_value_of_card(&self, card: char) -> i64 {
+        if card.is_digit(10) {
+            return card as i64 - '0' as i64;
+        }
+
+        if card == 'T' {
+            return 10;
+        }
+
+        if card == 'J' {
+            return 1;
+        }
+
+        if card == 'Q' {
+            return 12;
+        }
+
+        if card == 'K' {
+            return 13;
+        }
+
+        if card == 'A' {
+            return 14;
+        }
+
+        unreachable!();
+    }
+}
+
+fn second() {
+    let sorter = SecondSorter::new();
     solve(&sorter);
 }
 
