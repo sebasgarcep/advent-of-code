@@ -25,7 +25,7 @@ impl Sorter for FirstSorter {
         let mut hand = hand.clone();
         hand.sort();
 
-        let mut counts = Vec::with_capacity(5);
+        let mut counts: Vec<i64> = Vec::with_capacity(5);
         for idx in 0..hand.len() {
             if idx == 0 || hand[idx - 1] != hand[idx] {
                 counts.push(1);
@@ -101,7 +101,50 @@ impl SecondSorter {
 
 impl Sorter for SecondSorter {
     fn get_value_of_hand(&self, hand: &Vec<char>) -> i64 {
-        todo!()
+        let mut hand = hand.clone();
+        hand.sort();
+
+        let mut wildcards: i64 = 0;
+        let mut counts: Vec<i64> = Vec::with_capacity(5);
+        for idx in 0..hand.len() {
+            if hand[idx] == 'J' {
+                wildcards += 1;
+                continue;
+            }
+            if idx == 0 || hand[idx - 1] != hand[idx] {
+                counts.push(1);
+            } else {
+                let size = counts.len();
+                counts[size - 1] += 1;
+            }
+        }
+        counts.sort_by(|a, b| b.cmp(a));
+        if counts.len() == 0 {
+            counts.push(0);
+        }
+        counts[0] += wildcards;
+
+        if counts[0] == 5 {
+            return 7;
+        }
+        if counts[0] == 4 && counts[1] == 1 {
+            return 6;
+        }
+        if counts[0] == 3 && counts[1] == 2 {
+            return 5;
+        }
+        if counts[0] == 3 {
+            return 4;
+        }
+        if counts[0] == 2
+            && counts[1] == 2
+        {
+            return 3;
+        }
+        if counts[0] == 2 {
+            return 2;
+        }
+        return 1;
     }
 
     fn get_value_of_card(&self, card: char) -> i64 {
