@@ -10,12 +10,14 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    solve(2);
 }
 
-fn second() {}
+fn second() {
+    solve(1000000);
+}
 
-fn solve() {
+fn solve(empty_galaxy_size: usize) {
     let line_collection: Vec<String> = read_lines("data/2023/11/input.txt").collect();
 
     let mut empty_cols: Vec<bool> = Vec::with_capacity(SIZE_HINT);
@@ -39,7 +41,7 @@ fn solve() {
         }
     }
 
-    let mut i: usize = 0;
+    let mut i: usize;
     let mut j: usize = 0;
 
     let mut galaxies: Vec<(usize, usize)> = Vec::with_capacity(SIZE_HINT);
@@ -56,13 +58,13 @@ fn solve() {
                 }
             }
             if empty_cols[real_i] {
-                i += 2;
+                i += empty_galaxy_size;
             } else {
                 i += 1;
             }
         }
         if empty_rows[real_j] {
-            j += 2;
+            j += empty_galaxy_size;
         } else {
             j += 1;
         }
