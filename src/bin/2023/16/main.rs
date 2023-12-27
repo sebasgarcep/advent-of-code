@@ -8,10 +8,34 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    let map = get_map();
+    let result = calculate_num_energized_tiles(&map, (0, 0, Direction::East));
+    println!("{}", result);
 }
 
-fn second() {}
+fn second() {
+    let map = get_map();
+    let height = map.len() as i64;
+    let width = map[0].len() as i64;
+
+    let mut seeds: Vec<(i64, i64, Direction)> = Vec::with_capacity((2 * width + 2 * height) as usize);
+    for i in 0..width {
+        seeds.push((i, 0, Direction::South));
+        seeds.push((i, height - 1, Direction::North));
+    }
+
+    for j in 0..height {
+        seeds.push((0, j, Direction::East));
+        seeds.push((width - 1, j, Direction::West));
+    }
+
+    let result = seeds
+        .iter()
+        .map(|&s| calculate_num_energized_tiles(&map, s))
+        .max()
+        .unwrap();
+    println!("{}", result);
+}
 
 #[derive(PartialEq, Clone, Copy)]
 enum Tile {
@@ -41,11 +65,11 @@ impl Direction {
     }
 }
 
-fn solve() {
+fn get_map() -> Vec<Vec<Tile>> {
     let line_collection = read_lines("data/2023/16/input.txt");
 
     /* Indexed map[j][i] */
-    let map: Vec<Vec<Tile>> = line_collection
+    return line_collection
         .map(|row| {
             row.chars()
                 .map(|c| match c {
@@ -61,7 +85,9 @@ fn solve() {
                 .collect()
         })
         .collect();
+}
 
+fn calculate_num_energized_tiles(map: &Vec<Vec<Tile>>, seed: (i64, i64, Direction)) -> i64 {
     /* Indexed energy[j][i] */
     let mut energy: Vec<Vec<u8>> = map
         .iter()
@@ -72,7 +98,7 @@ fn solve() {
     let width = map[0].len() as i64;
 
     let mut candidates: Vec<(i64, i64, Direction)> = Vec::with_capacity(256);
-    candidates.push((0, 0, Direction::East));
+    candidates.push(seed);
 
     while let Some((start_i, start_j, direction)) = candidates.pop() {
         let mut i = start_i;
@@ -172,7 +198,8 @@ fn solve() {
             }
         }
     }
-    println!("{}", result);
+
+    return result;
 }
 
 fn can_treat_as_empty(map: &Vec<Vec<Tile>>, i: i64, j: i64, direction: Direction) -> bool {
