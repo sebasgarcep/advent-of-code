@@ -1,5 +1,7 @@
 extern crate lib;
 
+use std::time::Instant;
+
 use itertools::Itertools;
 use lib::reader::read_lines;
 
@@ -75,12 +77,25 @@ fn solve<S: Solver>() {
 }
 
 fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
-    return dfs(arrangement, hints, 0, 0, 0);
+    let start_time = Instant::now();
+    let num_broken_total: usize = hints.iter().sum();
+    let num_broken_known: usize = arrangement.iter().filter(|&&x| x == 1).count();
+    let num_available = num_broken_total - num_broken_known;
+    println!(
+        "Meta: {} {} {}",
+        num_broken_total, num_broken_known, num_available,
+    );
+    let result = dfs(arrangement, hints, num_available, 0, 0, 0);
+    let end_time = Instant::now();
+    let elapsed_time = end_time - start_time;
+    println!("Duration: {:.2}", elapsed_time.as_secs_f64());
+    return result;
 }
 
 fn dfs(
     arrangement: &Vec<i8>,
     hints: &Vec<usize>,
+    num_available: usize,
     pos: usize,
     count: usize,
     curr_hint: usize,
@@ -91,31 +106,61 @@ fn dfs(
     }
 
     if pos == arrangement.len() {
-        return dfs_edge_case(hints, count, curr_hint);
+        return dfs_edge_case(hints, num_available, count, curr_hint);
     }
 
     let val = arrangement[pos];
     if val != -1 {
-        return dfs_known_case(arrangement, hints, pos, count, curr_hint, val);
+        return dfs_known_case(
+            arrangement,
+            hints,
+            num_available,
+            pos,
+            count,
+            curr_hint,
+            val,
+        );
     }
 
-    return dfs_known_case(arrangement, hints, pos, count, curr_hint, 0)
-        + dfs_known_case(arrangement, hints, pos, count, curr_hint, 1);
+    return dfs_known_case(arrangement, hints, num_available, pos, count, curr_hint, 0)
+        + if num_available > 0 {
+            dfs_known_case(
+                arrangement,
+                hints,
+                num_available - 1,
+                pos,
+                count,
+                curr_hint,
+                1,
+            )
+        } else {
+            0
+        };
 }
 
-fn dfs_edge_case(hints: &Vec<usize>, count: usize, mut curr_hint: usize) -> usize {
+fn dfs_edge_case(
+    hints: &Vec<usize>,
+    num_available: usize,
+    count: usize,
+    mut curr_hint: usize,
+) -> usize {
     if count > 0 {
         if count != hints[curr_hint] {
             return 0;
         }
         curr_hint += 1;
     }
-    return if curr_hint == hints.len() { 1 } else { 0 };
+    return if num_available == 0 && curr_hint == hints.len() {
+        1
+    } else {
+        0
+    };
 }
 
 fn dfs_known_case(
     arrangement: &Vec<i8>,
     hints: &Vec<usize>,
+    num_available: usize,
     pos: usize,
     count: usize,
     curr_hint: usize,
@@ -125,15 +170,22 @@ fn dfs_known_case(
         if curr_hint >= hints.len() {
             return 0;
         }
-        return dfs(arrangement, hints, pos + 1, count + 1, curr_hint);
+        return dfs(
+            arrangement,
+            hints,
+            num_available,
+            pos + 1,
+            count + 1,
+            curr_hint,
+        );
     } else if val == 0 {
         if count == 0 {
-            return dfs(arrangement, hints, pos + 1, count, curr_hint);
+            return dfs(arrangement, hints, num_available, pos + 1, count, curr_hint);
         }
         if count != hints[curr_hint] {
             return 0;
         }
-        return dfs(arrangement, hints, pos + 1, 0, curr_hint + 1);
+        return dfs(arrangement, hints, num_available, pos + 1, 0, curr_hint + 1);
     } else {
         // Sanity check
         unreachable!();
