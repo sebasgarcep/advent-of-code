@@ -8,10 +8,47 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    solve::<FirstSolver>();
 }
 
-fn second() {}
+struct FirstSolver;
+
+impl Solver for FirstSolver {
+    fn parse_line(line: &str) -> (Direction, i64) {
+        let direction = match line.as_bytes()[0] as char {
+            'U' => Direction::North,
+            'L' => Direction::West,
+            'D' => Direction::South,
+            'R' => Direction::East,
+            _ => unreachable!(),
+        };
+        let first_split = line.find(' ').unwrap();
+        let second_split = first_split + 1 + line[(first_split + 1)..].find(' ').unwrap();
+        let steps: i64 = line[(first_split + 1)..second_split].parse().unwrap();
+        return (direction, steps);
+    }
+}
+
+fn second() {
+    solve::<SecondSolver>();
+}
+
+struct SecondSolver;
+
+impl Solver for SecondSolver {
+    fn parse_line(line: &str) -> (Direction, i64) {
+        let hex_start = line.find('#').unwrap() + 1;
+        let direction = match line.as_bytes()[hex_start + 5] as char {
+            '0' => Direction::East,
+            '1' => Direction::South,
+            '2' => Direction::West,
+            '3' => Direction::North,
+            _ => unreachable!(),
+        };
+        let steps: i64 = i64::from_str_radix(&line[hex_start..(hex_start + 5)], 16).unwrap();
+        return (direction, steps);
+    }
+}
 
 enum Direction {
     North,
@@ -20,52 +57,18 @@ enum Direction {
     East,
 }
 
-fn solve() {
+trait Solver {
+    fn parse_line(line: &str) -> (Direction, i64);
+}
+
+fn solve<S: Solver>() {
     let line_collection: Vec<String> = read_lines("data/2023/18/input.txt").collect();
 
-    // Find size of field
-    /*
-    let mut min_i: i64 = 0;
-    let mut min_j: i64 = 0;
-    let mut max_i: i64 = 0;
-    let mut max_j: i64 = 0;
-    let mut i: i64 = 0;
     let mut j: i64 = 0;
-    for line in line_collection.iter() {
-        let (direction, steps) = parse_line(line);
-        match direction {
-            Direction::North => {
-                j -= steps;
-                min_j = std::cmp::min(min_j, j);
-            }
-            Direction::West => {
-                i -= steps;
-                min_i = std::cmp::min(min_i, i);
-            }
-            Direction::South => {
-                j += steps;
-                max_j = std::cmp::max(max_j, j);
-            }
-            Direction::East => {
-                i += steps;
-                max_i = std::cmp::max(max_i, i);
-            }
-        }
-    }
-    */
-
-    // Calculate area using shoelace trapezoid formula
-    // let width: i64 = max_i - min_i + 1;
-    // let height: i64 = max_j - min_j + 1;
-    // let start_i: i64 = -min_i;
-    // let start_j: i64 = -min_j;
-    let start_j: i64 = 0;
-    // let mut i: i64 = start_i;
-    let mut j: i64 = start_j;
     let mut area: i64 = 0;
     let mut boundary: i64 = 0;
     for line in line_collection.iter() {
-        let (direction, steps) = parse_line(line);
+        let (direction, steps) = S::parse_line(&line);
         boundary += steps;
         match direction {
             Direction::North => {
@@ -74,7 +77,6 @@ fn solve() {
             Direction::West => {
                 /* Simplified from 1/2 * (y_1 + y_0) * (x_1 - x_0) */
                 area -= j * steps;
-                // i -= steps;
             }
             Direction::South => {
                 j += steps;
@@ -82,7 +84,6 @@ fn solve() {
             Direction::East => {
                 /* Simplified from 1/2 * (y_1 + y_0) * (x_1 - x_0) */
                 area += j * steps;
-                // i += steps;
             }
         }
     }
@@ -90,18 +91,4 @@ fn solve() {
     // Calculate result using Pick's theorem
     let result = boundary + area.abs() - (boundary >> 1) + 1;
     println!("{}", result);
-}
-
-fn parse_line(line: &str) -> (Direction, i64) {
-    let direction = match line.as_bytes()[0] as char {
-        'U' => Direction::North,
-        'L' => Direction::West,
-        'D' => Direction::South,
-        'R' => Direction::East,
-        _ => unreachable!(),
-    };
-    let first_split = line.find(' ').unwrap();
-    let second_split = first_split + 1 + line[(first_split + 1)..].find(' ').unwrap();
-    let steps: i64 = line[(first_split + 1)..second_split].parse().unwrap();
-    return (direction, steps);
 }
