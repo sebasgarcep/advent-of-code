@@ -78,12 +78,13 @@ fn solve<S: Solver>() {
 
 fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
     let start_time = Instant::now();
+    let arrangement_size: usize = arrangement.len();
     let num_broken_total: usize = hints.iter().sum();
     let num_broken_known: usize = arrangement.iter().filter(|&&x| x == 1).count();
     let num_available = num_broken_total - num_broken_known;
     println!(
-        "Meta: {} {} {}",
-        num_broken_total, num_broken_known, num_available,
+        "Meta: {} {} {} {}",
+        arrangement_size, num_broken_total, num_broken_known, num_available,
     );
     let result = dfs(arrangement, hints, num_available, 0, 0, 0);
     let end_time = Instant::now();
@@ -92,6 +93,8 @@ fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
     return result;
 }
 
+// Can be optimized by only doing recursion at branching points,
+// otherwise we can just keep iterating on a for loop.
 fn dfs(
     arrangement: &Vec<i8>,
     hints: &Vec<usize>,
