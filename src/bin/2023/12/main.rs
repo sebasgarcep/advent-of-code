@@ -15,15 +15,15 @@ fn first() {
 enum FirstSolver {}
 
 impl Solver for FirstSolver {
-    fn parse_line(mut line: String) -> (Vec<i64>, Vec<i64>) {
+    fn parse_line(mut line: String) -> (Vec<i8>, Vec<usize>) {
         let split_position = line.find(' ').unwrap();
         let hints = line
             .split_off(split_position)
             .trim()
             .split(',')
-            .map(|x| x.parse::<i64>().unwrap())
+            .map(|x| x.parse::<usize>().unwrap())
             .collect_vec();
-        let arrangement: Vec<i64> = line
+        let arrangement: Vec<i8> = line
             .chars()
             .map(|c| match c {
                 '.' => 0,
@@ -43,14 +43,14 @@ fn second() {
 enum SecondSolver {}
 
 impl Solver for SecondSolver {
-    fn parse_line(line: String) -> (Vec<i64>, Vec<i64>) {
+    fn parse_line(line: String) -> (Vec<i8>, Vec<usize>) {
         let (arrangement, hints) = FirstSolver::parse_line(line);
         let mut next_arrangement = Vec::with_capacity(5 * arrangement.len() + 4);
         let mut next_hints = Vec::with_capacity(5 * arrangement.len());
         for i in 0..5 {
             next_hints.extend(hints.iter());
             next_arrangement.extend(arrangement.iter());
-            if i <4 {
+            if i < 4 {
                 next_arrangement.push(-1);
             }
         }
@@ -59,13 +59,13 @@ impl Solver for SecondSolver {
 }
 
 trait Solver {
-    fn parse_line(line: String) -> (Vec<i64>, Vec<i64>);
+    fn parse_line(line: String) -> (Vec<i8>, Vec<usize>);
 }
 
 fn solve<S: Solver>() {
     let line_collection = read_lines("data/2023/12/input.txt");
 
-    let mut result: i64 = 0;
+    let mut result: usize = 0;
     for line in line_collection {
         let (arrangement, hints) = S::parse_line(line);
         result += get_result(&arrangement, &hints);
@@ -74,51 +74,68 @@ fn solve<S: Solver>() {
     println!("{}", result);
 }
 
-fn get_result(arrangement: &Vec<i64>, hints: &Vec<i64>) -> i64 {
-    let mut result: i64 = 0;
-    let count_unknowns = arrangement.iter().filter(|&&x| x == -1).count() as i64;
-    let mut candidate_arrangement = arrangement.clone();
-    /* Flatten recursion into a for loop where each candidate arrangement is
-       defined by a number in the range [0, 2^N-1]. */
-    for i in 0..((1 as i64) << count_unknowns) {
-        let mut acc = i;
-        for i in 0..arrangement.len() {
-            if arrangement[i] == -1 {
-                candidate_arrangement[i] = acc & 1;
-                acc >>= 1;
-            }
-        }
-        if matches_hints(&candidate_arrangement, &hints) {
-            result += 1;
-        }
-    }
-    return result;
+fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
+    return dfs(arrangement, hints, 0, 0, 0);
 }
 
-fn matches_hints(arrangement: &Vec<i64>, hints: &Vec<i64>) -> bool {
-    let mut count: i64 = 0;
-    let mut curr_hint: usize = 0;
-    for i in 0..arrangement.len() {
-        if arrangement[i] == 1 {
-            if curr_hint >= hints.len() {
-                return false;
-            }
-            count += 1;
-        }
-        if count > 0 && arrangement[i] == 0 {
-            if count != hints[curr_hint] {
-                return false;
-            }
-            count = 0;
-            curr_hint += 1;
-        }
+fn dfs(
+    arrangement: &Vec<i8>,
+    hints: &Vec<usize>,
+    pos: usize,
+    count: usize,
+    curr_hint: usize,
+) -> usize {
+    // Sanity check
+    if pos > arrangement.len() {
+        unreachable!();
     }
+
+    if pos == arrangement.len() {
+        return dfs_edge_case(hints, count, curr_hint);
+    }
+
+    let val = arrangement[pos];
+    if val != -1 {
+        return dfs_known_case(arrangement, hints, pos, count, curr_hint, val);
+    }
+
+    return dfs_known_case(arrangement, hints, pos, count, curr_hint, 0)
+        + dfs_known_case(arrangement, hints, pos, count, curr_hint, 1);
+}
+
+fn dfs_edge_case(hints: &Vec<usize>, count: usize, mut curr_hint: usize) -> usize {
     if count > 0 {
         if count != hints[curr_hint] {
-            return false;
+            return 0;
         }
-        // count = 0;
         curr_hint += 1;
     }
-    return curr_hint == hints.len();
+    return if curr_hint == hints.len() { 1 } else { 0 };
+}
+
+fn dfs_known_case(
+    arrangement: &Vec<i8>,
+    hints: &Vec<usize>,
+    pos: usize,
+    count: usize,
+    curr_hint: usize,
+    val: i8,
+) -> usize {
+    if val == 1 {
+        if curr_hint >= hints.len() {
+            return 0;
+        }
+        return dfs(arrangement, hints, pos + 1, count + 1, curr_hint);
+    } else if val == 0 {
+        if count == 0 {
+            return dfs(arrangement, hints, pos + 1, count, curr_hint);
+        }
+        if count != hints[curr_hint] {
+            return 0;
+        }
+        return dfs(arrangement, hints, pos + 1, 0, curr_hint + 1);
+    } else {
+        // Sanity check
+        unreachable!();
+    }
 }
