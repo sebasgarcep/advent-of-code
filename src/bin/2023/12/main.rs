@@ -9,16 +9,13 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    solve::<FirstSolver>();
 }
 
-fn second() {}
+enum FirstSolver {}
 
-fn solve() {
-    let line_collection = read_lines("data/2023/12/input.txt");
-
-    let mut result: i64 = 0;
-    for mut line in line_collection {
+impl Solver for FirstSolver {
+    fn parse_line(mut line: String) -> (Vec<i64>, Vec<i64>) {
         let split_position = line.find(' ').unwrap();
         let hints = line
             .split_off(split_position)
@@ -35,6 +32,42 @@ fn solve() {
                 _ => unreachable!(),
             })
             .collect_vec();
+        return (arrangement, hints);
+    }
+}
+
+fn second() {
+    solve::<SecondSolver>();
+}
+
+enum SecondSolver {}
+
+impl Solver for SecondSolver {
+    fn parse_line(line: String) -> (Vec<i64>, Vec<i64>) {
+        let (arrangement, hints) = FirstSolver::parse_line(line);
+        let mut next_arrangement = Vec::with_capacity(5 * arrangement.len() + 4);
+        let mut next_hints = Vec::with_capacity(5 * arrangement.len());
+        for i in 0..5 {
+            next_hints.extend(hints.iter());
+            next_arrangement.extend(arrangement.iter());
+            if i <4 {
+                next_arrangement.push(-1);
+            }
+        }
+        return (next_arrangement, next_hints);
+    }
+}
+
+trait Solver {
+    fn parse_line(line: String) -> (Vec<i64>, Vec<i64>);
+}
+
+fn solve<S: Solver>() {
+    let line_collection = read_lines("data/2023/12/input.txt");
+
+    let mut result: i64 = 0;
+    for line in line_collection {
+        let (arrangement, hints) = S::parse_line(line);
         result += get_result(&arrangement, &hints);
     }
 
