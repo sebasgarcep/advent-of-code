@@ -14,10 +14,93 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    let mut solver = FirstSolver::new();
+    solve(&mut solver);
 }
 
-fn second() {}
+struct FirstSolver {
+    iters: usize,
+    num_low: usize,
+    num_high: usize,
+}
+
+impl FirstSolver {
+    pub fn new() -> Self {
+        return Self {
+            iters: 0,
+            num_low: 0,
+            num_high: 0,
+        };
+    }
+}
+
+impl Solver for FirstSolver {
+    fn process_pulse(&mut self, _source: String, _destination: String, strength: bool) {
+        if strength {
+            self.num_high += 1;
+        } else {
+            self.num_low += 1;
+        }
+    }
+
+    fn get_result(&self) -> usize {
+        return self.num_low * self.num_high;
+    }
+
+    fn should_continue(&self) -> bool {
+        return self.iters < 1000;
+    }
+
+    fn pressed_button(&mut self) {
+        self.iters += 1;
+    }
+}
+
+fn second() {
+    let mut solver = SecondSolver::new();
+    solve(&mut solver);
+}
+
+struct SecondSolver {
+    iters: usize,
+    done: bool,
+}
+
+impl SecondSolver {
+    pub fn new() -> Self {
+        return Self {
+            iters: 0,
+            done: false,
+        };
+    }
+}
+
+impl Solver for SecondSolver {
+    fn process_pulse(&mut self, _source: String, destination: String, strength: bool) {
+        if !strength && destination == "rx".to_owned() {
+            self.done = true;
+        }
+    }
+
+    fn get_result(&self) -> usize {
+        return self.iters;
+    }
+
+    fn should_continue(&self) -> bool {
+        return !self.done;
+    }
+
+    fn pressed_button(&mut self) {
+        self.iters += 1;
+    }
+}
+
+trait Solver {
+    fn process_pulse(&mut self, source: String, destination: String, strength: bool);
+    fn get_result(&self) -> usize;
+    fn should_continue(&self) -> bool;
+    fn pressed_button(&mut self);
+}
 
 struct Module {
     destinations: Vec<String>,
@@ -30,34 +113,81 @@ enum ModuleClass {
     Conjunction(HashMap<String, bool>),
 }
 
-impl Module {
-    pub fn process_pulse(
-        &mut self,
-        pulse_queue: &mut VecDeque<(String, String, bool)>,
-        num_low: &mut usize,
-        num_high: &mut usize,
-        source: String,
-        destination: String,
-        input: bool,
-    ) {
-        let output = self.get_pulse_strength(&source, input);
-        if output.is_none() {
-            return;
+struct Machine {
+    pulse_queue: VecDeque<(String, String, bool)>,
+    module_map: HashMap<String, Module>,
+}
+
+impl Machine {
+    pub fn from_lines<I: Iterator<Item = String>>(line_collection: I) -> Self {
+        let mut module_map: HashMap<String, Module> = HashMap::new();
+        for line in line_collection {
+            let (name, module) = parse_line(line);
+            module_map.insert(name, module);
         }
-        let output = output.unwrap();
-        match output {
-            false => {
-                *num_low += self.destinations.len();
+        let conjunction_inserts = module_map
+            .iter()
+            .flat_map(|(name, module)| {
+                module
+                    .destinations
+                    .iter()
+                    .map(|destination| (name.clone(), destination.clone()))
+            })
+            .collect_vec();
+        for (name, destination) in conjunction_inserts {
+            let maybe_module = module_map.get_mut(&destination);
+            if maybe_module.is_none() {
+                continue;
             }
-            true => {
-                *num_high += self.destinations.len();
+            let module = maybe_module.unwrap();
+            if let ModuleClass::Conjunction(ref mut memory) = module.class {
+                memory.insert(name, false);
             }
         }
-        for item in self.destinations.iter() {
-            pulse_queue.push_back((destination.clone(), item.clone(), output));
+
+        return Self {
+            pulse_queue: VecDeque::new(),
+            module_map,
+        };
+    }
+
+    pub fn press_button<S: Solver>(&mut self, solver: &mut S) {
+        solver.pressed_button();
+        self.queue_pulse(solver, "button".to_owned(), "broadcaster".to_owned(), false);
+        while let Some(pulse) = self.pulse_queue.pop_front() {
+            let (source, destination, input) = pulse;
+            let output = {
+                let maybe_module: Option<&mut Module> = self.module_map.get_mut(&destination);
+                if maybe_module.is_none() {
+                    continue;
+                }
+                let module = maybe_module.unwrap();
+                let output = module.get_pulse_strength(&source, input);
+                if output.is_none() {
+                    continue;
+                }
+                output.unwrap()
+            };
+            let module = &self.module_map[&destination];
+            for item in module.destinations.iter().map(String::from).collect_vec() {
+                self.queue_pulse(solver, destination.clone(), item, output);
+            }
         }
     }
 
+    fn queue_pulse<S: Solver>(
+        &mut self,
+        solver: &mut S,
+        source: String,
+        destination: String,
+        strength: bool,
+    ) {
+        solver.process_pulse(source.clone(), destination.clone(), strength);
+        self.pulse_queue.push_back((source, destination, strength));
+    }
+}
+
+impl Module {
     fn get_pulse_strength(&mut self, source: &str, input: bool) -> Option<bool> {
         return match self.class {
             ModuleClass::Broadcast => Option::Some(input),
@@ -77,59 +207,15 @@ impl Module {
     }
 }
 
-fn solve() {
+fn solve<S: Solver>(solver: &mut S) {
     let line_collection = read_lines("data/2023/20/input.txt");
+    let mut machine = Machine::from_lines(line_collection);
 
-    let mut module_map: HashMap<String, Module> = HashMap::new();
-    for line in line_collection {
-        let (name, module) = parse_line(line);
-        module_map.insert(name, module);
+    while solver.should_continue() {
+        machine.press_button(solver);
     }
-    let conjunction_inserts = module_map
-        .iter()
-        .flat_map(|(name, module)| {
-            module
-                .destinations
-                .iter()
-                .map(|destination| (name.clone(), destination.clone()))
-        })
-        .collect_vec();
-    for (name, destination) in conjunction_inserts {
-        let maybe_module = module_map.get_mut(&destination);
-        if maybe_module.is_none() {
-            continue;
-        }
-        let module = maybe_module.unwrap();
-        if let ModuleClass::Conjunction(ref mut memory) = module.class {
-            memory.insert(name, false);
-        }
-    }
-
-    let mut num_low: usize = 0;
-    let mut num_high: usize = 0;
-    let mut pulse_queue: VecDeque<(String, String, bool)> = VecDeque::new();
-    for _ in 0..1000 {
-        pulse_queue.push_back(("button".to_owned(), "broadcaster".to_owned(), false));
-        num_low += 1;
-        while let Some(pulse) = pulse_queue.pop_front() {
-            let (source, destination, input) = pulse;
-            let maybe_module: Option<&mut Module> = module_map.get_mut(&destination);
-            if maybe_module.is_none() {
-                continue;
-            }
-            let module = maybe_module.unwrap();
-            module.process_pulse(
-                &mut pulse_queue,
-                &mut num_low,
-                &mut num_high,
-                source,
-                destination,
-                input,
-            );
-        }
-    }
-    let result = num_low * num_high;
-    println!("{} {} {}", num_low, num_high, result);
+    let result = solver.get_result();
+    println!("{}", result);
 }
 
 fn parse_line(mut line: String) -> (String, Module) {
