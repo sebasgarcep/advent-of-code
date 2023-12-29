@@ -77,16 +77,21 @@ fn solve<S: Solver>() {
 }
 
 fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
-    let start_time = Instant::now();
-    let arrangement_size: usize = arrangement.len();
+    let start_time: Instant = Instant::now();
     let num_broken_total: usize = hints.iter().sum();
     let num_broken_known: usize = arrangement.iter().filter(|&&x| x == 1).count();
-    let num_available = num_broken_total - num_broken_known;
-    println!(
-        "Meta: {} {} {} {}",
-        arrangement_size, num_broken_total, num_broken_known, num_available,
+    let num_available = arrangement.iter().filter(|&&x| x == -1).count();
+    let num_available_broken = num_broken_total - num_broken_known;
+    let num_available_operational = num_available - num_available_broken;
+    let result = dfs(
+        arrangement,
+        hints,
+        num_available_broken,
+        num_available_operational,
+        0,
+        0,
+        0,
     );
-    let result = dfs(arrangement, hints, num_available, 0, 0, 0);
     let end_time = Instant::now();
     let elapsed_time = end_time - start_time;
     println!("Duration: {:.2}", elapsed_time.as_secs_f64());
@@ -98,7 +103,8 @@ fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
 fn dfs(
     arrangement: &Vec<i8>,
     hints: &Vec<usize>,
-    num_available: usize,
+    num_available_broken: usize,
+    num_available_operational: usize,
     pos: usize,
     count: usize,
     curr_hint: usize,
@@ -109,7 +115,13 @@ fn dfs(
     }
 
     if pos == arrangement.len() {
-        return dfs_edge_case(hints, num_available, count, curr_hint);
+        return dfs_edge_case(
+            hints,
+            num_available_broken,
+            num_available_operational,
+            count,
+            curr_hint,
+        );
     }
 
     let val = arrangement[pos];
@@ -117,7 +129,8 @@ fn dfs(
         return dfs_known_case(
             arrangement,
             hints,
-            num_available,
+            num_available_broken,
+            num_available_operational,
             pos,
             count,
             curr_hint,
@@ -125,25 +138,39 @@ fn dfs(
         );
     }
 
-    return dfs_known_case(arrangement, hints, num_available, pos, count, curr_hint, 0)
-        + if num_available > 0 {
-            dfs_known_case(
-                arrangement,
-                hints,
-                num_available - 1,
-                pos,
-                count,
-                curr_hint,
-                1,
-            )
-        } else {
-            0
-        };
+    return if num_available_operational > 0 {
+        dfs_known_case(
+            arrangement,
+            hints,
+            num_available_broken,
+            num_available_operational - 1,
+            pos,
+            count,
+            curr_hint,
+            0,
+        )
+    } else {
+        0
+    } + if num_available_broken > 0 {
+        dfs_known_case(
+            arrangement,
+            hints,
+            num_available_broken - 1,
+            num_available_operational,
+            pos,
+            count,
+            curr_hint,
+            1,
+        )
+    } else {
+        0
+    };
 }
 
 fn dfs_edge_case(
     hints: &Vec<usize>,
-    num_available: usize,
+    num_available_broken: usize,
+    num_available_operational: usize,
     count: usize,
     mut curr_hint: usize,
 ) -> usize {
@@ -153,7 +180,10 @@ fn dfs_edge_case(
         }
         curr_hint += 1;
     }
-    return if num_available == 0 && curr_hint == hints.len() {
+    return if num_available_broken == 0
+        && num_available_operational == 0
+        && curr_hint == hints.len()
+    {
         1
     } else {
         0
@@ -163,7 +193,8 @@ fn dfs_edge_case(
 fn dfs_known_case(
     arrangement: &Vec<i8>,
     hints: &Vec<usize>,
-    num_available: usize,
+    num_available_broken: usize,
+    num_available_operational: usize,
     pos: usize,
     count: usize,
     curr_hint: usize,
@@ -176,19 +207,36 @@ fn dfs_known_case(
         return dfs(
             arrangement,
             hints,
-            num_available,
+            num_available_broken,
+            num_available_operational,
             pos + 1,
             count + 1,
             curr_hint,
         );
     } else if val == 0 {
         if count == 0 {
-            return dfs(arrangement, hints, num_available, pos + 1, count, curr_hint);
+            return dfs(
+                arrangement,
+                hints,
+                num_available_broken,
+                num_available_operational,
+                pos + 1,
+                count,
+                curr_hint,
+            );
         }
         if count != hints[curr_hint] {
             return 0;
         }
-        return dfs(arrangement, hints, num_available, pos + 1, 0, curr_hint + 1);
+        return dfs(
+            arrangement,
+            hints,
+            num_available_broken,
+            num_available_operational,
+            pos + 1,
+            0,
+            curr_hint + 1,
+        );
     } else {
         // Sanity check
         unreachable!();
