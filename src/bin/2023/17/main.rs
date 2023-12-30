@@ -81,11 +81,12 @@ impl Solver for SecondSolver {
         k: usize,
     ) -> Vec<(usize, usize, usize, usize)> {
         let mut neighbours = Vec::with_capacity(4);
+        let min_steps: usize = 4;
         // NORTH
         if j > 0
             && d != SOUTH
             && (d != NORTH || k < steps - 1)
-            && (k >= 4 || d == NORTH || d == DIRECTIONLESS)
+            && (k >= min_steps - 1 || d == NORTH || d == DIRECTIONLESS)
         {
             neighbours.push((i, j - 1, NORTH, if d == NORTH { k + 1 } else { 0 }));
         }
@@ -93,7 +94,7 @@ impl Solver for SecondSolver {
         if i > 0
             && d != EAST
             && (d != WEST || k < steps - 1)
-            && (k >= 4 || d == WEST || d == DIRECTIONLESS)
+            && (k >= min_steps - 1 || d == WEST || d == DIRECTIONLESS)
         {
             neighbours.push((i - 1, j, WEST, if d == WEST { k + 1 } else { 0 }));
         }
@@ -101,7 +102,7 @@ impl Solver for SecondSolver {
         if j < height - 1
             && d != NORTH
             && (d != SOUTH || k < steps - 1)
-            && (k >= 4 || d == SOUTH || d == DIRECTIONLESS)
+            && (k >= min_steps - 1 || d == SOUTH || d == DIRECTIONLESS)
         {
             neighbours.push((i, j + 1, SOUTH, if d == SOUTH { k + 1 } else { 0 }));
         }
@@ -109,7 +110,7 @@ impl Solver for SecondSolver {
         if i < width - 1
             && d != WEST
             && (d != EAST || k < steps - 1)
-            && (k >= 4 || d == EAST || d == DIRECTIONLESS)
+            && (k >= min_steps - 1 || d == EAST || d == DIRECTIONLESS)
         {
             neighbours.push((i + 1, j, EAST, if d == EAST { k + 1 } else { 0 }));
         }
@@ -204,33 +205,15 @@ fn solve<S: Solver>() {
     }
     // Finish Dijkstra
 
-    if steps == 10 {
-        for j in 0..height {
-            for i in 0..width {
-                let mut min_distance: usize = usize::MAX;
-                for d in 0..directions {
-                    for k in 0..steps {
-                        if grid_metadata[j][i][d][k].distance < min_distance {
-                            min_distance = grid_metadata[j][i][d][k].distance;
-                        }
-                    }
-                }
-                println!("i={} j={} d={}", i, j, min_distance);
-            }
-        }
-    }
-
-    /*
     let mut min_distance: usize = usize::MAX;
     for d in 0..directions {
         for k in 0..steps {
-            if grid_metadata[width - 1][height - 1][d][k].distance < min_distance {
-                min_distance = grid_metadata[width - 1][height - 1][d][k].distance;
+            if grid_metadata[height - 1][width - 1][d][k].distance < min_distance {
+                min_distance = grid_metadata[height - 1][width - 1][d][k].distance;
             }
         }
     }
 
     let result: usize = min_distance;
     println!("{}", result);
-     */
 }
