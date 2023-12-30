@@ -57,6 +57,24 @@ impl Solver for FirstSolver {
         }
         return neighbours;
     }
+
+    fn get_result(
+        grid_metadata: &Vec<Vec<Vec<Vec<NodeMetadata>>>>,
+        width: usize,
+        height: usize,
+        directions: usize,
+        steps: usize,
+    ) -> usize {
+        let mut min_distance: usize = usize::MAX;
+        for d in 1..directions {
+            for k in 0..steps {
+                if grid_metadata[height - 1][width - 1][d][k].distance < min_distance {
+                    min_distance = grid_metadata[height - 1][width - 1][d][k].distance;
+                }
+            }
+        }
+        return min_distance;
+    }
 }
 
 fn second() {
@@ -64,6 +82,12 @@ fn second() {
 }
 
 enum SecondSolver {}
+
+impl SecondSolver {
+    fn get_min_steps() -> usize {
+        return 4;
+    }
+}
 
 impl Solver for SecondSolver {
     fn get_max_steps() -> usize {
@@ -81,7 +105,7 @@ impl Solver for SecondSolver {
         k: usize,
     ) -> Vec<(usize, usize, usize, usize)> {
         let mut neighbours = Vec::with_capacity(4);
-        let min_steps: usize = 4;
+        let min_steps = Self::get_min_steps();
         // NORTH
         if j > 0
             && d != SOUTH
@@ -116,10 +140,30 @@ impl Solver for SecondSolver {
         }
         return neighbours;
     }
+
+    fn get_result(
+        grid_metadata: &Vec<Vec<Vec<Vec<NodeMetadata>>>>,
+        width: usize,
+        height: usize,
+        directions: usize,
+        steps: usize,
+    ) -> usize {
+        let min_steps = Self::get_min_steps();
+        let mut min_distance: usize = usize::MAX;
+        for d in 1..directions {
+            for k in (min_steps - 1)..steps {
+                if grid_metadata[height - 1][width - 1][d][k].distance < min_distance {
+                    min_distance = grid_metadata[height - 1][width - 1][d][k].distance;
+                }
+            }
+        }
+        return min_distance;
+    }
 }
 
 trait Solver {
     fn get_max_steps() -> usize;
+
     fn get_neighbours(
         width: usize,
         height: usize,
@@ -130,6 +174,14 @@ trait Solver {
         d: usize,
         k: usize,
     ) -> Vec<(usize, usize, usize, usize)>;
+
+    fn get_result(
+        grid_metadata: &Vec<Vec<Vec<Vec<NodeMetadata>>>>,
+        width: usize,
+        height: usize,
+        directions: usize,
+        steps: usize,
+    ) -> usize;
 }
 
 #[derive(Debug)]
@@ -205,15 +257,6 @@ fn solve<S: Solver>() {
     }
     // Finish Dijkstra
 
-    let mut min_distance: usize = usize::MAX;
-    for d in 0..directions {
-        for k in 0..steps {
-            if grid_metadata[height - 1][width - 1][d][k].distance < min_distance {
-                min_distance = grid_metadata[height - 1][width - 1][d][k].distance;
-            }
-        }
-    }
-
-    let result: usize = min_distance;
+    let result: usize = S::get_result(&grid_metadata, width, height, directions, steps);
     println!("{}", result);
 }
