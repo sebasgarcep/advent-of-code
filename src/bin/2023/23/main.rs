@@ -10,10 +10,38 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    solve::<FirstSolver>();
 }
 
-fn second() {}
+enum FirstSolver {}
+
+impl Solver for FirstSolver {
+    fn parse_lines<I: Iterator<Item = String>>(line_collection: I) -> Vec<Vec<Tile>> {
+        return line_collection
+            .map(|l| l.chars().map(Tile::from_char).collect_vec())
+            .collect_vec();
+    }
+}
+
+fn second() {
+    solve::<SecondSolver>();
+}
+
+enum SecondSolver {}
+
+impl Solver for SecondSolver {
+    fn parse_lines<I: Iterator<Item = String>>(line_collection: I) -> Vec<Vec<Tile>> {
+        let grid = FirstSolver::parse_lines(line_collection);
+        return grid
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|t| if t == Tile::Forest { t } else { Tile::Path })
+                    .collect_vec()
+            })
+            .collect_vec();
+    }
+}
 
 #[derive(PartialEq, Clone, Copy)]
 enum Direction {
@@ -44,11 +72,13 @@ impl Tile {
     }
 }
 
-fn solve() {
+trait Solver {
+    fn parse_lines<I: Iterator<Item = String>>(line_collection: I) -> Vec<Vec<Tile>>;
+}
+
+fn solve<S: Solver>() {
     let line_collection = read_lines("data/2023/23/input.txt");
-    let grid = line_collection
-        .map(|l| l.chars().map(Tile::from_char).collect_vec())
-        .collect_vec();
+    let grid = S::parse_lines(line_collection);
 
     let height = grid.len();
     let width = grid[0].len();
@@ -56,11 +86,10 @@ fn solve() {
     let source = (1, 0);
     let target = (width - 2, height - 1);
 
-    let mut visited = grid
+    let visited = grid
         .iter()
         .map(|row| row.iter().map(|_| false).collect_vec())
         .collect_vec();
-    visited[source.1][source.0] = true;
 
     let result: usize = find_longest_path(&grid, width, height, source, target, visited);
     println!("{}", result);
@@ -74,6 +103,7 @@ fn find_longest_path(
     target: (usize, usize),
     mut visited: Vec<Vec<bool>>,
 ) -> usize {
+    visited[source.1][source.0] = true;
     let mut curr = source;
     let mut size = 0;
     loop {
@@ -94,10 +124,15 @@ fn find_longest_path(
             }
             _ => {
                 size += 1;
-                return size + neighbours.into_iter().map(|pos| {
-                    let pos_visited = visited.clone();
-                    find_longest_path(grid, width, height, pos, target, pos_visited)
-                }).max().unwrap();
+                return size
+                    + neighbours
+                        .into_iter()
+                        .map(|pos| {
+                            let pos_visited = visited.clone();
+                            find_longest_path(grid, width, height, pos, target, pos_visited)
+                        })
+                        .max()
+                        .unwrap();
             }
         };
     }
