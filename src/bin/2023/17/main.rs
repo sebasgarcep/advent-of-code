@@ -18,10 +18,118 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    solve::<FirstSolver>();
 }
 
-fn second() {}
+enum FirstSolver {}
+
+impl Solver for FirstSolver {
+    fn get_max_steps() -> usize {
+        return 3;
+    }
+
+    fn get_neighbours(
+        width: usize,
+        height: usize,
+        _directions: usize,
+        steps: usize,
+        i: usize,
+        j: usize,
+        d: usize,
+        k: usize,
+    ) -> Vec<(usize, usize, usize, usize)> {
+        let mut neighbours = Vec::with_capacity(4);
+        // NORTH
+        if j > 0 && d != SOUTH && (d != NORTH || k < steps - 1) {
+            neighbours.push((i, j - 1, NORTH, if d == NORTH { k + 1 } else { 0 }));
+        }
+        // WEST
+        if i > 0 && d != EAST && (d != WEST || k < steps - 1) {
+            neighbours.push((i - 1, j, WEST, if d == WEST { k + 1 } else { 0 }));
+        }
+        // SOUTH
+        if j < height - 1 && d != NORTH && (d != SOUTH || k < steps - 1) {
+            neighbours.push((i, j + 1, SOUTH, if d == SOUTH { k + 1 } else { 0 }));
+        }
+        // EAST
+        if i < width - 1 && d != WEST && (d != EAST || k < steps - 1) {
+            neighbours.push((i + 1, j, EAST, if d == EAST { k + 1 } else { 0 }));
+        }
+        return neighbours;
+    }
+}
+
+fn second() {
+    solve::<SecondSolver>();
+}
+
+enum SecondSolver {}
+
+impl Solver for SecondSolver {
+    fn get_max_steps() -> usize {
+        return 10;
+    }
+
+    fn get_neighbours(
+        width: usize,
+        height: usize,
+        _directions: usize,
+        steps: usize,
+        i: usize,
+        j: usize,
+        d: usize,
+        k: usize,
+    ) -> Vec<(usize, usize, usize, usize)> {
+        let mut neighbours = Vec::with_capacity(4);
+        // NORTH
+        if j > 0
+            && d != SOUTH
+            && (d != NORTH || k < steps - 1)
+            && (k >= 4 || d == NORTH || d == DIRECTIONLESS)
+        {
+            neighbours.push((i, j - 1, NORTH, if d == NORTH { k + 1 } else { 0 }));
+        }
+        // WEST
+        if i > 0
+            && d != EAST
+            && (d != WEST || k < steps - 1)
+            && (k >= 4 || d == WEST || d == DIRECTIONLESS)
+        {
+            neighbours.push((i - 1, j, WEST, if d == WEST { k + 1 } else { 0 }));
+        }
+        // SOUTH
+        if j < height - 1
+            && d != NORTH
+            && (d != SOUTH || k < steps - 1)
+            && (k >= 4 || d == SOUTH || d == DIRECTIONLESS)
+        {
+            neighbours.push((i, j + 1, SOUTH, if d == SOUTH { k + 1 } else { 0 }));
+        }
+        // EAST
+        if i < width - 1
+            && d != WEST
+            && (d != EAST || k < steps - 1)
+            && (k >= 4 || d == EAST || d == DIRECTIONLESS)
+        {
+            neighbours.push((i + 1, j, EAST, if d == EAST { k + 1 } else { 0 }));
+        }
+        return neighbours;
+    }
+}
+
+trait Solver {
+    fn get_max_steps() -> usize;
+    fn get_neighbours(
+        width: usize,
+        height: usize,
+        _directions: usize,
+        steps: usize,
+        i: usize,
+        j: usize,
+        d: usize,
+        k: usize,
+    ) -> Vec<(usize, usize, usize, usize)>;
+}
 
 #[derive(Debug)]
 struct NodeMetadata {
@@ -42,7 +150,7 @@ impl NodeMetadata {
     }
 }
 
-fn solve() {
+fn solve<S: Solver>() {
     let line_collection = read_lines("data/2023/17/input.txt");
     let grid = line_collection
         .map(|l| {
@@ -55,7 +163,7 @@ fn solve() {
     let height = grid.len();
     let width = grid[0].len();
     let directions: usize = 5;
-    let steps: usize = 3;
+    let steps: usize = S::get_max_steps();
 
     // Dijkstra algorithm
     let mut grid_metadata = (0..height)
@@ -83,7 +191,7 @@ fn solve() {
     }
 
     while let Some(((i, j, d, k), _)) = queue.pop() {
-        let neighbours = get_neighbours(width, height, directions, steps, i, j, d, k);
+        let neighbours = S::get_neighbours(width, height, directions, steps, i, j, d, k);
         for (ni, nj, nd, nk) in neighbours {
             let alt = grid_metadata[j][i][d][k].distance + grid[nj][ni];
             let node_metadata = &mut grid_metadata[nj][ni][nd][nk];
@@ -94,61 +202,35 @@ fn solve() {
             }
         }
     }
+    // Finish Dijkstra
 
-    // println!("Result: {:?}", grid_metadata[width - 1][height - 1]);
-    let mut min_distance: usize = usize::MAX;
-    // let mut curr = (width - 1, height - 1, directions, steps);
-    for d in 0..directions {
-        for k in 0..steps {
-            if grid_metadata[width - 1][height - 1][d][k].distance < min_distance {
-                min_distance = grid_metadata[width - 1][height - 1][d][k].distance;
-                // curr = (width - 1, height - 1, d, k);
+    if steps == 10 {
+        for j in 0..height {
+            for i in 0..width {
+                let mut min_distance: usize = usize::MAX;
+                for d in 0..directions {
+                    for k in 0..steps {
+                        if grid_metadata[j][i][d][k].distance < min_distance {
+                            min_distance = grid_metadata[j][i][d][k].distance;
+                        }
+                    }
+                }
+                println!("i={} j={} d={}", i, j, min_distance);
             }
         }
     }
 
     /*
-    println!(
-        "Min distance: {:?}",
-        grid_metadata[curr.1][curr.0][curr.2][curr.3].distance
-    );
-    println!("Path: {:?}", curr);
-    while let Some((i, j, d, k)) = grid_metadata[curr.1][curr.0][curr.2][curr.3].previous {
-        curr = (i, j, d, k);
-        println!("Path: {:?}", curr);
+    let mut min_distance: usize = usize::MAX;
+    for d in 0..directions {
+        for k in 0..steps {
+            if grid_metadata[width - 1][height - 1][d][k].distance < min_distance {
+                min_distance = grid_metadata[width - 1][height - 1][d][k].distance;
+            }
+        }
     }
-    */
 
     let result: usize = min_distance;
     println!("{}", result);
-}
-
-fn get_neighbours(
-    width: usize,
-    height: usize,
-    _directions: usize,
-    steps: usize,
-    i: usize,
-    j: usize,
-    d: usize,
-    k: usize,
-) -> Vec<(usize, usize, usize, usize)> {
-    let mut neighbours = Vec::with_capacity(4);
-    // NORTH
-    if j > 0 && d != SOUTH && (d != NORTH || k < steps - 1) {
-        neighbours.push((i, j - 1, NORTH, if d == NORTH { k + 1 } else { 0 }));
-    }
-    // WEST
-    if i > 0 && d != EAST && (d != WEST || k < steps - 1) {
-        neighbours.push((i - 1, j, WEST, if d == WEST { k + 1 } else { 0 }));
-    }
-    // SOUTH
-    if j < height - 1 && d != NORTH && (d != SOUTH || k < steps - 1) {
-        neighbours.push((i, j + 1, SOUTH, if d == SOUTH { k + 1 } else { 0 }));
-    }
-    // EAST
-    if i < width - 1 && d != WEST && (d != EAST || k < steps - 1) {
-        neighbours.push((i + 1, j, EAST, if d == EAST { k + 1 } else { 0 }));
-    }
-    return neighbours;
+     */
 }
