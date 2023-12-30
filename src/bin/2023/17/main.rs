@@ -95,10 +95,31 @@ fn solve() {
         }
     }
 
-    let mut curr = (width - 1, height - 1);
-    println!("Min distance: {:?}", grid_metadata[curr.1][curr.0]);
+    // println!("Result: {:?}", grid_metadata[width - 1][height - 1]);
+    let mut min_distance: usize = usize::MAX;
+    // let mut curr = (width - 1, height - 1, directions, steps);
+    for d in 0..directions {
+        for k in 0..steps {
+            if grid_metadata[width - 1][height - 1][d][k].distance < min_distance {
+                min_distance = grid_metadata[width - 1][height - 1][d][k].distance;
+                // curr = (width - 1, height - 1, d, k);
+            }
+        }
+    }
 
-    let mut result: usize = 0;
+    /*
+    println!(
+        "Min distance: {:?}",
+        grid_metadata[curr.1][curr.0][curr.2][curr.3].distance
+    );
+    println!("Path: {:?}", curr);
+    while let Some((i, j, d, k)) = grid_metadata[curr.1][curr.0][curr.2][curr.3].previous {
+        curr = (i, j, d, k);
+        println!("Path: {:?}", curr);
+    }
+    */
+
+    let result: usize = min_distance;
     println!("{}", result);
 }
 
@@ -114,19 +135,19 @@ fn get_neighbours(
 ) -> Vec<(usize, usize, usize, usize)> {
     let mut neighbours = Vec::with_capacity(4);
     // NORTH
-    if j > 0 && (d != NORTH || k < steps - 1) {
+    if j > 0 && d != SOUTH && (d != NORTH || k < steps - 1) {
         neighbours.push((i, j - 1, NORTH, if d == NORTH { k + 1 } else { 0 }));
     }
     // WEST
-    if i > 0 && (d != WEST || k < steps - 1) {
+    if i > 0 && d != EAST && (d != WEST || k < steps - 1) {
         neighbours.push((i - 1, j, WEST, if d == WEST { k + 1 } else { 0 }));
     }
     // SOUTH
-    if j < height - 1 && (d != SOUTH || k < steps - 1) {
+    if j < height - 1 && d != NORTH && (d != SOUTH || k < steps - 1) {
         neighbours.push((i, j + 1, SOUTH, if d == SOUTH { k + 1 } else { 0 }));
     }
     // EAST
-    if i < width - 1 && (d != EAST || k < steps - 1) {
+    if i < width - 1 && d != WEST && (d != EAST || k < steps - 1) {
         neighbours.push((i + 1, j, EAST, if d == EAST { k + 1 } else { 0 }));
     }
     return neighbours;
