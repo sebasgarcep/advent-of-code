@@ -224,13 +224,14 @@ impl CompressedGraph {
         .filter(|(direction, pos)| match grid[pos.1][pos.0] {
             Tile::Path => true,
             Tile::Slope(pos_direction) => {
-                allow_unreachable || pos_direction
-                    != match *direction {
-                        Direction::North => Direction::South,
-                        Direction::West => Direction::East,
-                        Direction::South => Direction::North,
-                        Direction::East => Direction::West,
-                    }
+                allow_unreachable
+                    || pos_direction
+                        != match *direction {
+                            Direction::North => Direction::South,
+                            Direction::West => Direction::East,
+                            Direction::South => Direction::North,
+                            Direction::East => Direction::West,
+                        }
             }
             Tile::Forest => false,
         })
