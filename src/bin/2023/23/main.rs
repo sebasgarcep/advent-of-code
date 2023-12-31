@@ -155,12 +155,11 @@ impl CompressedGraph {
             );
         }
 
-        let result = Self {
+        return Self {
             source_index: index_map[&source],
             target_index: index_map[&target],
             nodes,
         };
-        return result;
     }
 
     fn get_reachable_choice_nodes(
