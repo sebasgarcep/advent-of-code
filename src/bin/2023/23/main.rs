@@ -1,6 +1,9 @@
 extern crate lib;
 extern crate priority_queue;
 
+use std::collections::HashMap;
+
+use bit_set::BitSet;
 use itertools::Itertools;
 use lib::reader::read_lines;
 
@@ -72,6 +75,204 @@ impl Tile {
     }
 }
 
+#[derive(Debug)]
+struct CompressedGraph {
+    source_index: usize,
+    target_index: usize,
+    nodes: Vec<CompressedGraphNode>,
+}
+
+#[derive(Debug)]
+struct CompressedGraphNode {
+    edges: Vec<CompressedGraphEdge>,
+}
+
+#[derive(Debug)]
+struct CompressedGraphEdge {
+    node_index: usize,
+    length: usize,
+}
+
+impl CompressedGraph {
+    pub fn get_longest_path(&self) -> usize {
+        let visited = BitSet::new();
+        return self.get_longest_path_from_node(self.source_index, &visited);
+    }
+
+    fn get_longest_path_from_node(&self, curr_index: usize, visited: &BitSet) -> usize {
+        if curr_index == self.target_index {
+            return 0;
+        }
+        let mut next_visited = visited.clone();
+        next_visited.insert(curr_index);
+        let node = &self.nodes[curr_index];
+        return node
+            .edges
+            .iter()
+            .filter(|edge| !next_visited.contains(edge.node_index))
+            .map(|edge| {
+                edge.length + self.get_longest_path_from_node(edge.node_index, &next_visited)
+            })
+            .max()
+            .unwrap_or(0);
+    }
+
+    pub fn from_grid(
+        grid: &Vec<Vec<Tile>>,
+        width: usize,
+        height: usize,
+        source: (usize, usize),
+        target: (usize, usize),
+    ) -> Self {
+        let mut index_map: HashMap<(usize, usize), usize> = HashMap::new();
+        let mut nodes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+        let mut nodes = Vec::with_capacity(256);
+
+        for j in 0..height {
+            for i in 0..width {
+                let curr = (i, j);
+                if !Self::is_choice_node(grid, width, height, source, target, curr) {
+                    continue;
+                }
+                index_map.insert(curr, nodes.len());
+                nodes_map.insert(nodes.len(), curr);
+                let node = CompressedGraphNode {
+                    edges: Vec::with_capacity(4),
+                };
+                nodes.push(node);
+            }
+        }
+
+        for (idx, node) in nodes.iter_mut().enumerate() {
+            let curr = &nodes_map[&idx];
+            node.edges.extend(
+                Self::get_reachable_choice_nodes(grid, width, height, source, target, *curr)
+                    .into_iter()
+                    .map(|(pos, length)| CompressedGraphEdge {
+                        node_index: index_map[&pos],
+                        length,
+                    }),
+            );
+        }
+
+        let result = Self {
+            source_index: index_map[&source],
+            target_index: index_map[&target],
+            nodes,
+        };
+        return result;
+    }
+
+    fn get_reachable_choice_nodes(
+        grid: &Vec<Vec<Tile>>,
+        width: usize,
+        height: usize,
+        source: (usize, usize),
+        target: (usize, usize),
+        curr: (usize, usize),
+    ) -> Vec<((usize, usize), usize)> {
+        return Self::get_neighbours(grid, width, height, curr, false)
+            .into_iter()
+            .filter_map(|mut node| {
+                let mut prev = curr;
+                let mut length = 1;
+                while !Self::is_choice_node(grid, width, height, source, target, node) {
+                    length += 1;
+                    let neighbours = Self::get_neighbours(grid, width, height, node, false);
+                    let maybe_next = neighbours.into_iter().find(|&pos| pos != prev);
+                    if let Option::Some(next) = maybe_next {
+                        prev = node;
+                        node = next;
+                    } else {
+                        return Option::None;
+                    }
+                }
+                return Option::Some((node, length));
+            })
+            .collect_vec();
+    }
+
+    fn is_choice_node(
+        grid: &Vec<Vec<Tile>>,
+        width: usize,
+        height: usize,
+        source: (usize, usize),
+        target: (usize, usize),
+        curr: (usize, usize),
+    ) -> bool {
+        let neighbours = Self::get_neighbours(&grid, width, height, curr, true);
+        return curr == source || curr == target || neighbours.len() > 2;
+    }
+
+    fn get_neighbours(
+        grid: &Vec<Vec<Tile>>,
+        width: usize,
+        height: usize,
+        curr: (usize, usize),
+        allow_unreachable: bool,
+    ) -> Vec<(usize, usize)> {
+        return vec![
+            Direction::North,
+            Direction::West,
+            Direction::South,
+            Direction::East,
+        ]
+        .into_iter()
+        .filter_map(|direction| {
+            Self::get_neighbour_by_direction(width, height, curr, direction)
+                .map(|pos| (direction, pos))
+        })
+        .filter(|(direction, pos)| match grid[pos.1][pos.0] {
+            Tile::Path => true,
+            Tile::Slope(pos_direction) => {
+                allow_unreachable || pos_direction
+                    != match *direction {
+                        Direction::North => Direction::South,
+                        Direction::West => Direction::East,
+                        Direction::South => Direction::North,
+                        Direction::East => Direction::West,
+                    }
+            }
+            Tile::Forest => false,
+        })
+        .map(|(_, pos)| pos)
+        .collect();
+    }
+
+    fn get_neighbour_by_direction(
+        width: usize,
+        height: usize,
+        curr: (usize, usize),
+        direction: Direction,
+    ) -> Option<(usize, usize)> {
+        let (i, j) = curr;
+        match direction {
+            Direction::North => {
+                if j > 0 {
+                    return Option::Some((i, j - 1));
+                }
+            }
+            Direction::West => {
+                if i > 0 {
+                    return Option::Some((i - 1, j));
+                }
+            }
+            Direction::South => {
+                if j < height - 1 {
+                    return Option::Some((i, j + 1));
+                }
+            }
+            Direction::East => {
+                if i < width - 1 {
+                    return Option::Some((i + 1, j));
+                }
+            }
+        };
+
+        return Option::None;
+    }
+}
+
 trait Solver {
     fn parse_lines<I: Iterator<Item = String>>(line_collection: I) -> Vec<Vec<Tile>>;
 }
@@ -86,122 +287,8 @@ fn solve<S: Solver>() {
     let source = (1, 0);
     let target = (width - 2, height - 1);
 
-    let visited = grid
-        .iter()
-        .map(|row| row.iter().map(|_| false).collect_vec())
-        .collect_vec();
+    let compressed_graph = CompressedGraph::from_grid(&grid, width, height, source, target);
 
-    let result: usize = find_longest_path(&grid, width, height, source, target, visited);
+    let result = compressed_graph.get_longest_path();
     println!("{}", result);
-}
-
-fn find_longest_path(
-    grid: &Vec<Vec<Tile>>,
-    width: usize,
-    height: usize,
-    source: (usize, usize),
-    target: (usize, usize),
-    mut visited: Vec<Vec<bool>>,
-) -> usize {
-    visited[source.1][source.0] = true;
-    let mut curr = source;
-    let mut size = 0;
-    loop {
-        // println!("curr={:?}", curr);
-        let neighbours = get_neighbours(&grid, width, height, &visited, curr);
-        // println!("neighbours={:?}", neighbours);
-        match neighbours.len() {
-            0 => {
-                return 0;
-            }
-            1 => {
-                curr = neighbours[0];
-                size += 1;
-                visited[curr.1][curr.0] = true;
-                if curr == target {
-                    return size;
-                }
-            }
-            _ => {
-                size += 1;
-                return size
-                    + neighbours
-                        .into_iter()
-                        .map(|pos| {
-                            let pos_visited = visited.clone();
-                            find_longest_path(grid, width, height, pos, target, pos_visited)
-                        })
-                        .max()
-                        .unwrap();
-            }
-        };
-    }
-}
-
-fn get_neighbours(
-    grid: &Vec<Vec<Tile>>,
-    width: usize,
-    height: usize,
-    visited: &Vec<Vec<bool>>,
-    curr: (usize, usize),
-) -> Vec<(usize, usize)> {
-    return vec![
-        Direction::North,
-        Direction::West,
-        Direction::South,
-        Direction::East,
-    ]
-    .into_iter()
-    .filter_map(|direction| {
-        get_neighbour_by_direction(width, height, curr, direction).map(|pos| (direction, pos))
-    })
-    .filter(|(direction, pos)| match grid[pos.1][pos.0] {
-        Tile::Path => true,
-        Tile::Slope(pos_direction) => {
-            pos_direction
-                != match *direction {
-                    Direction::North => Direction::South,
-                    Direction::West => Direction::East,
-                    Direction::South => Direction::North,
-                    Direction::East => Direction::West,
-                }
-        }
-        Tile::Forest => false,
-    })
-    .map(|(_, pos)| pos)
-    .filter(|(i, j)| !visited[*j][*i])
-    .collect();
-}
-
-fn get_neighbour_by_direction(
-    width: usize,
-    height: usize,
-    curr: (usize, usize),
-    direction: Direction,
-) -> Option<(usize, usize)> {
-    let (i, j) = curr;
-    match direction {
-        Direction::North => {
-            if j > 0 {
-                return Option::Some((i, j - 1));
-            }
-        }
-        Direction::West => {
-            if i > 0 {
-                return Option::Some((i - 1, j));
-            }
-        }
-        Direction::South => {
-            if j < height - 1 {
-                return Option::Some((i, j + 1));
-            }
-        }
-        Direction::East => {
-            if i < width - 1 {
-                return Option::Some((i + 1, j));
-            }
-        }
-    };
-
-    return Option::None;
 }
