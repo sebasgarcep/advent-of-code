@@ -96,12 +96,14 @@ struct CompressedGraphEdge {
 impl CompressedGraph {
     pub fn get_longest_path(&self) -> usize {
         let visited = BitSet::new();
-        return self.get_longest_path_from_node(self.source_index, &visited);
+        return self
+            .get_longest_path_from_node(self.source_index, &visited)
+            .unwrap();
     }
 
-    fn get_longest_path_from_node(&self, curr_index: usize, visited: &BitSet) -> usize {
+    fn get_longest_path_from_node(&self, curr_index: usize, visited: &BitSet) -> Option<usize> {
         if curr_index == self.target_index {
-            return 0;
+            return Option::Some(0);
         }
         let mut next_visited = visited.clone();
         next_visited.insert(curr_index);
@@ -110,11 +112,11 @@ impl CompressedGraph {
             .edges
             .iter()
             .filter(|edge| !next_visited.contains(edge.node_index))
-            .map(|edge| {
-                edge.length + self.get_longest_path_from_node(edge.node_index, &next_visited)
+            .filter_map(|edge| {
+                self.get_longest_path_from_node(edge.node_index, &next_visited)
+                    .map(|result_length| edge.length + result_length)
             })
-            .max()
-            .unwrap_or(0);
+            .max_by_key(|path_length| *path_length);
     }
 
     pub fn from_grid(
