@@ -69,14 +69,17 @@ trait Solver {
         let mut result: usize = 0;
         for line in line_collection {
             let (arrangement, hints) = Self::parse_line(line);
+            let start_time: Instant = Instant::now();
             result += Self::get_result(&arrangement, &hints);
+            let end_time = Instant::now();
+            let elapsed_time = end_time - start_time;
+            println!("Duration: {:.2}", elapsed_time.as_secs_f64());
         }
 
         println!("{}", result);
     }
 
     fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
-        let start_time: Instant = Instant::now();
         let num_broken_total: usize = hints.iter().sum();
         let num_broken_known: usize = arrangement.iter().filter(|&&x| x == 1).count();
         let num_available = arrangement.iter().filter(|&&x| x == -1).count();
@@ -91,9 +94,6 @@ trait Solver {
             0,
             0,
         );
-        let end_time = Instant::now();
-        let elapsed_time = end_time - start_time;
-        println!("Duration: {:.2}", elapsed_time.as_secs_f64());
         return result;
     }
 
