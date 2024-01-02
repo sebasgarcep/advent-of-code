@@ -17,7 +17,7 @@ fn first() {
 enum FirstSolver {}
 
 impl Solver for FirstSolver {
-    fn parse_line(mut line: String) -> (Vec<i8>, Vec<usize>) {
+    fn parse_line(mut line: String) -> (Vec<Symbol>, Vec<usize>) {
         let split_position = line.find(' ').unwrap();
         let hints = line
             .split_off(split_position)
@@ -25,12 +25,12 @@ impl Solver for FirstSolver {
             .split(',')
             .map(|x| x.parse::<usize>().unwrap())
             .collect_vec();
-        let arrangement: Vec<i8> = line
+        let arrangement = line
             .chars()
             .map(|c| match c {
-                '.' => 0,
-                '#' => 1,
-                '?' => -1,
+                '.' => Symbol::Operational,
+                '#' => Symbol::Broken,
+                '?' => Symbol::Unknown,
                 _ => unreachable!(),
             })
             .collect_vec();
@@ -45,23 +45,30 @@ fn second() {
 enum SecondSolver {}
 
 impl Solver for SecondSolver {
-    fn parse_line(line: String) -> (Vec<i8>, Vec<usize>) {
+    fn parse_line(line: String) -> (Vec<Symbol>, Vec<usize>) {
         let (arrangement, hints) = FirstSolver::parse_line(line);
         let mut next_arrangement = Vec::with_capacity(5 * arrangement.len() + 4);
         let mut next_hints = Vec::with_capacity(5 * arrangement.len());
         for i in 0..5 {
             next_hints.extend(hints.iter());
-            next_arrangement.extend(arrangement.iter());
+            next_arrangement.extend(arrangement.clone());
             if i < 4 {
-                next_arrangement.push(-1);
+                next_arrangement.push(Symbol::Unknown);
             }
         }
         return (next_arrangement, next_hints);
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Symbol {
+    Operational,
+    Broken,
+    Unknown,
+}
+
 trait Solver {
-    fn parse_line(line: String) -> (Vec<i8>, Vec<usize>);
+    fn parse_line(line: String) -> (Vec<Symbol>, Vec<usize>);
 
     fn solve() {
         let line_collection = read_lines("data/2023/12/input.txt");
@@ -79,10 +86,10 @@ trait Solver {
         println!("{}", result);
     }
 
-    fn get_result(arrangement: &Vec<i8>, hints: &Vec<usize>) -> usize {
+    fn get_result(arrangement: &Vec<Symbol>, hints: &Vec<usize>) -> usize {
         let num_broken_total: usize = hints.iter().sum();
-        let num_broken_known: usize = arrangement.iter().filter(|&&x| x == 1).count();
-        let num_available = arrangement.iter().filter(|&&x| x == -1).count();
+        let num_broken_known: usize = arrangement.iter().filter(|&&x| x == Symbol::Broken).count();
+        let num_available = arrangement.iter().filter(|&&x| x == Symbol::Unknown).count();
         let num_available_broken = num_broken_total - num_broken_known;
         let num_available_operational = num_available - num_available_broken;
         let result = Self::dfs(
@@ -98,7 +105,7 @@ trait Solver {
     }
 
     fn dfs(
-        arrangement: &Vec<i8>,
+        arrangement: &Vec<Symbol>,
         hints: &Vec<usize>,
         num_available_broken: usize,
         num_available_operational: usize,
@@ -122,7 +129,7 @@ trait Solver {
         }
 
         let val = arrangement[pos];
-        if val != -1 {
+        if val != Symbol::Unknown {
             return Self::dfs_known_case(
                 arrangement,
                 hints,
@@ -144,7 +151,7 @@ trait Solver {
                 pos,
                 count,
                 curr_hint,
-                0,
+                Symbol::Operational,
             )
         } else {
             0
@@ -157,7 +164,7 @@ trait Solver {
                 pos,
                 count,
                 curr_hint,
-                1,
+                Symbol::Broken,
             )
         } else {
             0
@@ -188,16 +195,16 @@ trait Solver {
     }
 
     fn dfs_known_case(
-        arrangement: &Vec<i8>,
+        arrangement: &Vec<Symbol>,
         hints: &Vec<usize>,
         num_available_broken: usize,
         num_available_operational: usize,
         pos: usize,
         count: usize,
         curr_hint: usize,
-        val: i8,
+        val: Symbol,
     ) -> usize {
-        if val == 1 {
+        if val == Symbol::Broken {
             if curr_hint >= hints.len() {
                 return 0;
             }
@@ -210,7 +217,7 @@ trait Solver {
                 count + 1,
                 curr_hint,
             );
-        } else if val == 0 {
+        } else if val == Symbol::Operational {
             if count == 0 {
                 return Self::dfs(
                     arrangement,
