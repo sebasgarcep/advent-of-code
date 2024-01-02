@@ -29,7 +29,7 @@ impl Solver for FirstSolver {
 }
 
 fn second() {
-    // solve::<SecondSolver>();
+    solve::<SecondSolver>();
 }
 
 enum SecondSolver {}
@@ -50,11 +50,13 @@ impl Solver for SecondSolver {
     }
 }
 
+#[derive(Debug)]
 struct Graph {
     nodes: Vec<Node>,
     index_map: HashMap<[u8; 3], usize>,
 }
 
+#[derive(Debug)]
 struct Node {
     label: [u8; 3],
     left: usize,
@@ -113,7 +115,7 @@ impl Graph {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Direction {
     Left,
     Right,
@@ -138,7 +140,7 @@ impl SolverMetadata {
             if can_stop[current] {
                 stop_positions.insert(step);
             }
-            current = graph.get_next(index, *direction);
+            current = graph.get_next(current, *direction);
         }
         return Self {
             next: current,
@@ -196,7 +198,6 @@ fn solve<S: Solver>() {
         }
         result += instructions.len();
     }
-
     result += curr_intersection.iter().min().unwrap();
 
     println!("{}", result);
