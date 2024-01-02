@@ -51,7 +51,7 @@ impl Solver for SecondSolver {
         let mut next_hints = Vec::with_capacity(5 * arrangement.len());
         for i in 0..5 {
             next_hints.extend(hints.iter());
-            next_arrangement.extend(arrangement.clone());
+            next_arrangement.extend(arrangement.iter());
             if i < 4 {
                 next_arrangement.push(Symbol::Unknown);
             }
