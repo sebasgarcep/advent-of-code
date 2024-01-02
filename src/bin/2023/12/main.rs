@@ -75,6 +75,7 @@ trait Solver {
 
         let mut result: usize = 0;
         for line in line_collection {
+            println!("{}", line);
             let (arrangement, hints) = Self::parse_line(line);
             let start_time: Instant = Instant::now();
             result += Self::get_result(&arrangement, &hints);
