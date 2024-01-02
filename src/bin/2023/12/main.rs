@@ -75,7 +75,13 @@ trait Solver {
 
         let mut result: usize = 0;
         for line in line_collection {
-            println!("{}", line);
+            println!("Case 1: {}", line);
+            let mut split_iterator = line.split(' ');
+            println!(
+                "Case 2: {0}?{0}?{0}?{0}?{0} {1},{1},{1},{1},{1}",
+                split_iterator.next().unwrap(),
+                split_iterator.next().unwrap(),
+            );
             let (arrangement, hints) = Self::parse_line(line);
             let start_time: Instant = Instant::now();
             result += Self::get_result(&arrangement, &hints);
@@ -90,7 +96,10 @@ trait Solver {
     fn get_result(arrangement: &Vec<Symbol>, hints: &Vec<usize>) -> usize {
         let num_broken_total: usize = hints.iter().sum();
         let num_broken_known: usize = arrangement.iter().filter(|&&x| x == Symbol::Broken).count();
-        let num_available = arrangement.iter().filter(|&&x| x == Symbol::Unknown).count();
+        let num_available = arrangement
+            .iter()
+            .filter(|&&x| x == Symbol::Unknown)
+            .count();
         let num_available_broken = num_broken_total - num_broken_known;
         let num_available_operational = num_available - num_available_broken;
         let result = Self::dfs(
