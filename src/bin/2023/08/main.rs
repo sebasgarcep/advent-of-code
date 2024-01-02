@@ -3,6 +3,7 @@ extern crate num;
 
 use itertools::Itertools;
 use lib::reader::read_lines;
+use num::Integer;
 use std::collections::HashMap;
 
 pub fn main() {
@@ -121,6 +122,16 @@ enum Direction {
     Right,
 }
 
+impl Direction {
+    pub fn from_char(c: char) -> Self {
+        return match c {
+            'L' => Direction::Left,
+            'R' => Direction::Right,
+            _ => unreachable!(),
+        };
+    }
+}
+
 trait Solver {
     fn get_start_positions(graph: &Graph) -> Vec<usize>;
     fn get_can_stop(graph: &Graph) -> Vec<bool>;
@@ -168,11 +179,7 @@ fn solve<S: Solver>() {
         .next()
         .unwrap()
         .chars()
-        .map(|c| match c {
-            'L' => Direction::Left,
-            'R' => Direction::Right,
-            _ => unreachable!(),
-        })
+        .map(Direction::from_char)
         .collect_vec();
 
     let _ = line_iterator.next();
@@ -180,7 +187,7 @@ fn solve<S: Solver>() {
     let can_stop = S::get_can_stop(&graph);
     let start_positions = S::get_start_positions(&graph);
 
-    // Get metadata
+    // Get metadata for start and for simple cycle.
     let metadata = start_positions
         .iter()
         .map(|start_position| {
@@ -193,44 +200,68 @@ fn solve<S: Solver>() {
         })
         .collect_vec();
 
-    let min_steps = metadata
+    // Calculate minimum amount of steps required to get all pointers inside a
+    // simple cycle.
+    let entry_steps = metadata
         .iter()
         .map(|(md_start, _)| md_start.steps)
-        .max()
-        .unwrap();
-
-    // Get Align Metadata (gets rid of first metadata)
-    let metadata = metadata
-        .into_iter()
-        .map(|(md_start, md_stop)| (md_stop.steps, min_steps % md_start.steps))
         .collect_vec();
 
-    // LCM
-    let lcm = metadata
-        .iter()
-        .fold(1, |acc, (steps, _)| num::integer::lcm(acc, *steps));
+    let min_steps = *entry_steps.iter().max().unwrap();
 
     // Align
-    let min_step_size = instructions.len();
-    let mut values = vec![min_step_size; metadata.len()];
-    let mut align_steps = min_step_size;
-    let mut step_size = min_step_size;
-    while !values
+    let cycle_lengths = metadata
         .iter()
-        .zip(metadata.iter())
-        .all(|(value, (_, target_value))| *value == *target_value)
-    {
+        .map(|(_, md_stop)| md_stop.steps)
+        .collect_vec();
+
+    // Use first metadata to see where pointer is after minimum amount of steps
+    // to get all pointers into the cycles.
+    let mut values = metadata
+        .iter()
+        .map(|(md_start, _)| min_steps % md_start.steps)
+        .collect_vec();
+    let mut previous_values = values.clone();
+
+    let min_step_size = cycle_lengths.iter().fold(0, fold_gcd);
+    // Prevent getting trapped in an endless loop by ensuring that pairwise cycle
+    // lengths have a GCD of 1.
+    for j in 1..cycle_lengths.len() {
+        for i in 0..j {
+            assert!(
+                num::integer::gcd(
+                    cycle_lengths[i] / min_step_size,
+                    cycle_lengths[j] / min_step_size
+                ) == 1
+            )
+        }
+    }
+
+    let mut align_steps = 0;
+    let mut step_size = min_step_size;
+    while !values.iter().all(|val| *val == 0) {
         align_steps += step_size;
         for i in 0..values.len() {
-            let (cycle_length, target_value) = metadata[i];
-            let previous_value = values[i];
+            previous_values[i] = values[i];
+        }
+        for i in 0..values.len() {
             values[i] += step_size;
-            values[i] %= cycle_length;
-            if previous_value != target_value && values[i] == target_value {
-                step_size = num::integer::lcm(step_size, cycle_length);
+            values[i] %= cycle_lengths[i];
+        }
+        for i in 0..values.len() {
+            if previous_values[i] != 0 && values[i] == 0 {
+                step_size = num::integer::lcm(step_size, cycle_lengths[i]);
             }
         }
     }
 
-    println!("{}", min_steps + lcm - align_steps);
+    println!("{}", min_steps + align_steps);
+}
+
+fn fold_gcd<T: Integer + Copy>(acc: T, value: &T) -> T {
+    if acc.is_zero() {
+        *value
+    } else {
+        num::integer::gcd(acc, *value)
+    }
 }
