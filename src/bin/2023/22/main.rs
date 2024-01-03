@@ -1,8 +1,8 @@
 extern crate lib;
-extern crate priority_queue;
 
-use std::collections::HashSet;
+use std::collections::VecDeque;
 
+use bit_set::BitSet;
 use itertools::Itertools;
 use lib::reader::read_lines;
 
@@ -17,10 +17,67 @@ fn first() {
 
 enum FirstSolver {}
 
-impl Solver for FirstSolver {}
+impl Solver for FirstSolver {
+    fn get_result(
+        bricks: &Vec<Brick>,
+        dependants: &Vec<BitSet>,
+        dependencies: &Vec<BitSet>,
+    ) -> usize {
+        return (0..bricks.len())
+            .filter(|a| {
+                for b in dependants[*a].iter() {
+                    if dependencies[b]
+                        .difference(&BitSet::from_iter(vec![*a].into_iter()))
+                        .collect::<BitSet>()
+                        .is_empty()
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            })
+            .count();
+    }
+}
 
-fn second() {}
+fn second() {
+    SecondSolver::solve();
+}
 
+enum SecondSolver {}
+
+impl Solver for SecondSolver {
+    fn get_result(
+        bricks: &Vec<Brick>,
+        dependants: &Vec<BitSet>,
+        dependencies: &Vec<BitSet>,
+    ) -> usize {
+        return (0..bricks.len())
+            .map(|a| {
+                let mut removed_elems = BitSet::with_capacity(bricks.len());
+                let mut queue = VecDeque::new();
+                queue.push_back(a);
+                while let Option::Some(elem) = queue.pop_front() {
+                    removed_elems.insert(elem);
+                    for b in dependants[elem].iter() {
+                        if removed_elems.contains(b)
+                            || !dependencies[b]
+                                .difference(&removed_elems)
+                                .collect::<BitSet>()
+                                .is_empty()
+                        {
+                            continue;
+                        }
+                        queue.push_back(b);
+                    }
+                }
+                return removed_elems.len() - 1;
+            })
+            .sum();
+    }
+}
+
+#[derive(Debug)]
 struct Brick {
     start: (usize, usize, usize),
     end: (usize, usize, usize),
@@ -50,6 +107,12 @@ impl Brick {
 }
 
 trait Solver {
+    fn get_result(
+        bricks: &Vec<Brick>,
+        dependants: &Vec<BitSet>,
+        dependencies: &Vec<BitSet>,
+    ) -> usize;
+
     fn solve() {
         let mut bricks = read_lines("data/2023/22/input.txt")
             .map(Brick::from_line)
@@ -74,11 +137,12 @@ trait Solver {
             .unwrap()
             + 1;
 
+        // We don't care about the initial order of the bricks
         bricks.sort_by_key(|b| std::cmp::min(b.start.2, b.end.2));
         let mut space: Vec<Vec<Vec<usize>>> =
             vec![vec![vec![usize::MAX; space_height]; space_depth]; space_width];
-        let mut dependants: Vec<HashSet<usize>> = vec![HashSet::new(); bricks.len()];
-        let mut dependencies: Vec<HashSet<usize>> = vec![HashSet::new(); bricks.len()];
+        let mut dependants: Vec<BitSet> = vec![BitSet::new(); bricks.len()];
+        let mut dependencies: Vec<BitSet> = vec![BitSet::new(); bricks.len()];
 
         for (idx, brick) in bricks.iter().enumerate() {
             let min_x = std::cmp::min(brick.start.0, brick.end.0);
@@ -127,20 +191,7 @@ trait Solver {
             }
         }
 
-        let result = (0..bricks.len())
-            .filter(|a| {
-                for b in dependants[*a].iter() {
-                    if dependencies[*b]
-                        .difference(&HashSet::from([*a]))
-                        .collect::<HashSet<_>>()
-                        .is_empty()
-                    {
-                        return false;
-                    }
-                }
-                return true;
-            })
-            .count();
+        let result = Self::get_result(&bricks, &dependants, &dependencies);
         println!("{}", result);
     }
 
