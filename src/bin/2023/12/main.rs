@@ -1,7 +1,5 @@
 extern crate lib;
 
-use std::time::Instant;
-
 use itertools::Itertools;
 use lib::reader::read_lines;
 
@@ -75,185 +73,91 @@ trait Solver {
 
         let mut result: usize = 0;
         for line in line_collection {
-            println!("Case 1: {}", line);
-            let mut split_iterator = line.split(' ');
-            println!(
-                "Case 2: {0}?{0}?{0}?{0}?{0} {1},{1},{1},{1},{1}",
-                split_iterator.next().unwrap(),
-                split_iterator.next().unwrap(),
-            );
             let (arrangement, hints) = Self::parse_line(line);
-            let start_time: Instant = Instant::now();
             result += Self::get_result(&arrangement, &hints);
-            let end_time = Instant::now();
-            let elapsed_time = end_time - start_time;
-            println!("Duration: {:.2}", elapsed_time.as_secs_f64());
         }
-
         println!("{}", result);
     }
 
     fn get_result(arrangement: &Vec<Symbol>, hints: &Vec<usize>) -> usize {
-        let num_broken_total: usize = hints.iter().sum();
-        let num_broken_known: usize = arrangement.iter().filter(|&&x| x == Symbol::Broken).count();
-        let num_available = arrangement
-            .iter()
-            .filter(|&&x| x == Symbol::Unknown)
-            .count();
-        let num_available_broken = num_broken_total - num_broken_known;
-        let num_available_operational = num_available - num_available_broken;
-        let result = Self::dfs(
-            arrangement,
-            hints,
-            num_available_broken,
-            num_available_operational,
-            0,
-            0,
-            0,
-        );
-        return result;
-    }
-
-    fn dfs(
-        arrangement: &Vec<Symbol>,
-        hints: &Vec<usize>,
-        num_available_broken: usize,
-        num_available_operational: usize,
-        pos: usize,
-        count: usize,
-        curr_hint: usize,
-    ) -> usize {
-        // Sanity check
-        if pos > arrangement.len() {
-            unreachable!();
-        }
-
-        if pos == arrangement.len() {
-            return Self::dfs_edge_case(
-                hints,
-                num_available_broken,
-                num_available_operational,
-                count,
-                curr_hint,
-            );
-        }
-
-        let val = arrangement[pos];
-        if val != Symbol::Unknown {
-            return Self::dfs_known_case(
-                arrangement,
-                hints,
-                num_available_broken,
-                num_available_operational,
-                pos,
-                count,
-                curr_hint,
-                val,
-            );
-        }
-
-        return if num_available_operational > 0 {
-            Self::dfs_known_case(
-                arrangement,
-                hints,
-                num_available_broken,
-                num_available_operational - 1,
-                pos,
-                count,
-                curr_hint,
-                Symbol::Operational,
-            )
-        } else {
-            0
-        } + if num_available_broken > 0 {
-            Self::dfs_known_case(
-                arrangement,
-                hints,
-                num_available_broken - 1,
-                num_available_operational,
-                pos,
-                count,
-                curr_hint,
-                Symbol::Broken,
-            )
-        } else {
-            0
-        };
-    }
-
-    fn dfs_edge_case(
-        hints: &Vec<usize>,
-        num_available_broken: usize,
-        num_available_operational: usize,
-        count: usize,
-        mut curr_hint: usize,
-    ) -> usize {
-        if count > 0 {
-            if count != hints[curr_hint] {
-                return 0;
+        let max_hint_count = hints.len();
+        let max_block_size = *hints.iter().max().unwrap();
+        let mut prev_state = vec![vec![0; max_block_size + 1]; hints.len() + 1];
+        let mut curr_state = vec![vec![0; max_block_size + 1]; hints.len() + 1];
+        for (idx, symbol) in arrangement.iter().enumerate() {
+            (prev_state, curr_state) = (curr_state, prev_state);
+            Self::clear_vec(&mut curr_state);
+            if idx == 0 {
+                prev_state[0][0] = 1;
             }
-            curr_hint += 1;
+            Self::propagate_state(
+                &hints,
+                max_hint_count,
+                max_block_size,
+                &prev_state,
+                &mut curr_state,
+                *symbol,
+            );
         }
-        return if num_available_broken == 0
-            && num_available_operational == 0
-            && curr_hint == hints.len()
-        {
-            1
-        } else {
-            0
-        };
+        return curr_state[hints.len()][0] + curr_state[hints.len() - 1][hints[hints.len() - 1]];
     }
 
-    fn dfs_known_case(
-        arrangement: &Vec<Symbol>,
-        hints: &Vec<usize>,
-        num_available_broken: usize,
-        num_available_operational: usize,
-        pos: usize,
-        count: usize,
-        curr_hint: usize,
-        val: Symbol,
-    ) -> usize {
-        if val == Symbol::Broken {
-            if curr_hint >= hints.len() {
-                return 0;
+    fn clear_vec(data: &mut Vec<Vec<usize>>) {
+        for j in 0..data.len() {
+            for i in 0..data[j].len() {
+                data[j][i] = 0;
             }
-            return Self::dfs(
-                arrangement,
-                hints,
-                num_available_broken,
-                num_available_operational,
-                pos + 1,
-                count + 1,
-                curr_hint,
-            );
-        } else if val == Symbol::Operational {
-            if count == 0 {
-                return Self::dfs(
-                    arrangement,
+        }
+    }
+
+    fn propagate_state(
+        hints: &Vec<usize>,
+        max_hint_count: usize,
+        max_block_size: usize,
+        prev_state: &Vec<Vec<usize>>,
+        mut curr_state: &mut Vec<Vec<usize>>,
+        symbol: Symbol,
+    ) {
+        match symbol {
+            Symbol::Operational => {
+                for i in 0..=max_hint_count {
+                    for j in 0..=max_block_size {
+                        if j > 0 {
+                            if i >= max_hint_count || hints[i] != j {
+                                continue;
+                            }
+                            curr_state[i + 1][0] += prev_state[i][j];
+                        } else {
+                            curr_state[i][0] += prev_state[i][j];
+                        }
+                    }
+                }
+            }
+            Symbol::Broken => {
+                for i in 0..=max_hint_count {
+                    for j in 0..max_block_size {
+                        curr_state[i][j + 1] += prev_state[i][j];
+                    }
+                }
+            }
+            Symbol::Unknown => {
+                Self::propagate_state(
                     hints,
-                    num_available_broken,
-                    num_available_operational,
-                    pos + 1,
-                    count,
-                    curr_hint,
+                    max_hint_count,
+                    max_block_size,
+                    &prev_state,
+                    &mut curr_state,
+                    Symbol::Operational,
+                );
+                Self::propagate_state(
+                    hints,
+                    max_hint_count,
+                    max_block_size,
+                    &prev_state,
+                    &mut curr_state,
+                    Symbol::Broken,
                 );
             }
-            if count != hints[curr_hint] {
-                return 0;
-            }
-            return Self::dfs(
-                arrangement,
-                hints,
-                num_available_broken,
-                num_available_operational,
-                pos + 1,
-                0,
-                curr_hint + 1,
-            );
-        } else {
-            // Sanity check
-            unreachable!();
         }
     }
 }
