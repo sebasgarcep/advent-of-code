@@ -72,6 +72,13 @@ impl CompressedGraph {
     }
 }
 
+/// We contract all edges between two nodes. It is more likely to pick an edge
+/// that is not part of the min-cut than one that is part of the min-cut.
+/// Even as we contract the graph, nodes separated by the min-cut will only
+/// be connected once, while nodes on the same side of a min-cut may be connected
+/// to each other by many edges, product of the contraction process. This keeps the
+/// likelihood in favor of contracting edges that are not part of the min-cut.
+/// Source: https://en.wikipedia.org/wiki/Karger's_algorithm
 struct KargersAlgorithm {
     // Indexed by node idx
     node_groups: Vec<BitSet>,
