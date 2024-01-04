@@ -19,6 +19,7 @@ dependencies = [
  "ndarray-linalg",
  "num",
  "priority-queue",
+ "rand",
 ]
 
 [[package]]
