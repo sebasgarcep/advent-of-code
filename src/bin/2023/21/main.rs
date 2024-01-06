@@ -1,7 +1,5 @@
 extern crate lib;
 
-use std::collections::HashSet;
-
 use lib::reader::read_lines;
 
 pub fn main() {
@@ -10,72 +8,79 @@ pub fn main() {
 }
 
 fn first() {
-    solve();
+    FirstSolver::solve();
+}
+
+enum FirstSolver {}
+
+impl Solver for FirstSolver {
+    fn get_num_steps() -> usize {
+        return 64;
+    }
 }
 
 fn second() {}
 
-fn solve() {
-    let line_collection = read_lines("data/2023/21/input.txt");
+trait Solver {
+    fn get_num_steps() -> usize;
 
-    let mut seed: Option<(i64, i64)> = Option::None;
-    /* Indexed map[j][i] */
-    let mut map: Vec<Vec<bool>> = Vec::with_capacity(1024);
-    for (j, line) in line_collection.enumerate() {
-        let mut row = Vec::with_capacity(line.len());
-        for (i, char) in line.chars().enumerate() {
-            match char {
-                '.' => row.push(true),
-                'S' => {
-                    row.push(true);
-                    seed = Option::Some((i as i64, j as i64));
-                }
-                '#' => row.push(false),
-                _ => unreachable!(),
-            };
+    fn solve() {
+        let line_collection = read_lines("data/2023/21/input.txt");
+
+        /* Indexed map[j][i] */
+        let mut map: Vec<Vec<bool>> = vec![];
+        let mut curr_counts: Vec<Vec<usize>> = vec![];
+        for line in line_collection {
+            let mut map_row = Vec::with_capacity(line.len());
+            let mut curr_counts_row = Vec::with_capacity(line.len());
+            for (i, char) in line.chars().enumerate() {
+                map_row.push(true);
+                curr_counts_row.push(0);
+                match char {
+                    '.' => {}
+                    'S' => curr_counts_row[i] = 1,
+                    '#' => map_row[i] = false,
+                    _ => unreachable!(),
+                };
+            }
+            map.push(map_row);
+            curr_counts.push(curr_counts_row);
         }
-        map.push(row);
-    }
-    let seed = seed.unwrap();
-    let width = map[0].len() as i64;
-    let height = map.len() as i64;
+        let height = map.len();
+        let width = map[0].len();
 
-    let positions = HashSet::from([seed]);
-    let result = bfs(64, &map, width, height, positions, 0);
-    println!("{}", result);
-}
+        let mut prev_counts = curr_counts.clone();
+        for _ in 0..Self::get_num_steps() {
+            std::mem::swap(&mut prev_counts, &mut curr_counts);
+            Self::clear_counts(&mut curr_counts);
 
-fn bfs(
-    limit: i64,
-    map: &Vec<Vec<bool>>,
-    width: i64,
-    height: i64,
-    positions: HashSet<(i64, i64)>,
-    step: i64,
-) -> i64 {
-    if step >= limit {
-        return positions.len() as i64;
-    }
-    let mut next_positions: HashSet<(i64, i64)> = HashSet::with_capacity(256);
-    for (i, j) in positions {
-        propose_candidate(map, width, height, i - 1, j, &mut next_positions);
-        propose_candidate(map, width, height, i + 1, j, &mut next_positions);
-        propose_candidate(map, width, height, i, j - 1, &mut next_positions);
-        propose_candidate(map, width, height, i, j + 1, &mut next_positions);
-    }
-    return bfs(limit, map, width, height, next_positions, step + 1);
-}
+            for j in 0..height {
+                for i in 0..width {
+                    if i > 0 && map[j][i - 1] {
+                        curr_counts[j][i - 1] |= prev_counts[j][i];
+                    }
+                    if i < width - 1 && map[j][i + 1] {
+                        curr_counts[j][i + 1] |= prev_counts[j][i];
+                    }
+                    if j > 0 && map[j - 1][i] {
+                        curr_counts[j - 1][i] |= prev_counts[j][i];
+                    }
+                    if j < width - 1 && map[j + 1][i] {
+                        curr_counts[j + 1][i] |= prev_counts[j][i];
+                    }
+                }
+            }
+        }
 
-fn propose_candidate(
-    map: &Vec<Vec<bool>>,
-    width: i64,
-    height: i64,
-    i: i64,
-    j: i64,
-    positions: &mut HashSet<(i64, i64)>,
-) {
-    if j < 0 || j >= height || i < 0 || i >= width || !map[j as usize][i as usize] {
-        return;
+        let result = curr_counts.iter().map(|row| row.iter().sum::<usize>()).sum::<usize>();
+        println!("{}", result);
     }
-    positions.insert((i, j));
+
+    fn clear_counts(counts: &mut Vec<Vec<usize>>) {
+        for j in 0..counts.len() {
+            for i in 0..counts[j].len() {
+                counts[j][i] = 0;
+            }
+        }
+    }
 }
