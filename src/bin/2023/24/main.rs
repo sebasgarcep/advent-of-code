@@ -83,7 +83,7 @@ impl Solver for SecondSolver {
     /// - x_r(t) = p_r + t * v_r
     /// - x_i(t_i) = x_r(t_i)
     /// **** NOT LINEAR ****
-    /// 
+    /// - (p_r_x - p_i_x) / (v_r_x - v_i_x) = - (p_r_y - p_i_y) / (v_r_y - v_i_y) = - (p_r_z - p_i_z) / (v_r_z - v_i_z)
     fn get_result(entities: Vec<Entity>) -> i64 {
         unimplemented!()
     }
