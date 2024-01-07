@@ -3,8 +3,8 @@ extern crate ndarray;
 extern crate ndarray_linalg;
 
 use lib::reader::read_lines;
-use ndarray::array;
-use ndarray_linalg::Solve;
+use ndarray::{array, Array, Array1, Array2};
+use ndarray_linalg::{Solve, Determinant};
 
 pub fn main() {
     first();
@@ -64,7 +64,9 @@ impl Solver for FirstSolver {
     }
 }
 
-fn second() {}
+fn second() {
+    solve::<SecondSolver>();
+}
 
 enum SecondSolver {}
 
@@ -82,13 +84,72 @@ impl Solver for SecondSolver {
     /// - x_i(t) = p_i + t * v_i
     /// - x_r(t) = p_r + t * v_r
     /// - x_i(t_i) = x_r(t_i)
-    /// **** NOT LINEAR ****
-    /// - (p_r_x - p_i_x) / (v_r_x - v_i_x) = - (p_r_y - p_i_y) / (v_r_y - v_i_y) = - (p_r_z - p_i_z) / (v_r_z - v_i_z)
+    /// Which implies:
+    /// p_r = p_i - t_i * (v_r - v_i)
+    /// Let w_i = t_i * (v_r - v_i).
+    /// Thus: p_r = p_i - w_i
+    /// And because p_r is stable for each i, for every pair i < j we have:
+    /// p_i - w_i = p_j - w_j <-> w_i - w_j = p_i - p_j
+    /// Let's suppose we have N data points. Then we have 3N unknowns and
+    /// 3N(N-1)/2 equations. Thus for the system to be completely determined
+    /// we need at least 7 data points (3N=3N(N-1)/2 <-> N=3). This leads to
+    /// the following system of equations. Suppose we want to express this
+    /// as Ax=B. Then:
+    /// A = (
+    ///   1, -1, 0, ..., 0, 0
+    ///   1, 0, -1, ..., 0, 0
+    ///   ...
+    ///   1, 0, 0, ..., 0, -1
+    ///   0, 1, -1, ..., 0, 0
+    ///   ...
+    ///   0, 0, 0, ..., 1, -1
+    /// )
+    /// [1's and 0's are 3x3 blocks]
+    ///
+    /// x = (
+    ///   w_1
+    ///   ...
+    ///   w_N
+    /// )
+    ///
+    /// B = (
+    ///   p_1 - p_2
+    ///   p_1 - p_3
+    ///   ...
+    ///   p_1 - p_N
+    ///   p_2 - p_3
+    ///   ...
+    ///   p_{N-1} - p_N
+    /// )
     fn get_result(entities: Vec<Entity>) -> i64 {
-        unimplemented!()
+        let n = 3;
+        let d = 3;
+        let mut a: Array2<f64> = Array::zeros((d * n * (n - 1) >> 1, d * n));
+        let mut b: Array1<f64> = Array::zeros(d * n * (n - 1) >> 1);
+        let mut pos = 0;
+        for i in 0..(n - 1) {
+            for j in (i + 1)..n {
+                // Set a
+                for s in 0..d {
+                    for t in 0..d {
+                        a[(d * pos + t, d * i + s)] = 1.0;
+                        a[(d * pos + t, d * j + s)] = -1.0;
+                    }
+                }
+                // Set b
+                b[d * pos + 0] = entities[i].px - entities[j].px;
+                b[d * pos + 1] = entities[i].py - entities[j].py;
+                b[d * pos + 2] = entities[i].pz - entities[j].pz;
+                // Increase counter
+                pos += 1;
+            }
+        }
+        println!("d={}", a.det().unwrap());
+        return 0;
     }
 }
 
+#[derive(Debug)]
 struct Entity {
     px: f64,
     py: f64,
