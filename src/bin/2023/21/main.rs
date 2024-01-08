@@ -67,7 +67,96 @@ fn second() {
 
 enum SecondSolver {}
 
+impl SecondSolver {
+    fn clear_reached(reached: &mut Vec<Vec<bool>>, width: usize, height: usize) {
+        for j in 0..height {
+            for i in 0..width {
+                reached[j][i] = false;
+            }
+        }
+    }
+
+    fn calculate_steps(
+        map: &Vec<Vec<bool>>,
+        width: usize,
+        height: usize,
+        start_position: (usize, usize),
+        max_num_steps: usize,
+    ) -> (usize, usize) {
+        let mut prev_reached = vec![vec![false; width]; height];
+        let mut curr_reached = prev_reached.clone();
+        curr_reached[start_position.1][start_position.0] = true;
+        let mut prev_size = 0;
+        let mut curr_size = 0;
+        let mut steps = 0;
+        for _ in 0..max_num_steps {
+            std::mem::swap(&mut prev_reached, &mut curr_reached);
+            Self::clear_reached(&mut curr_reached, width, height);
+            curr_size = 0;
+            for j in 0..height {
+                for i in 0..width {
+                    if i > 0 && map[j][i - 1] {
+                        curr_reached[j][i - 1] |= prev_reached[j][i];
+                    }
+                    if i < width - 1 && map[j][i + 1] {
+                        curr_reached[j][i + 1] |= prev_reached[j][i];
+                    }
+                    if j > 0 && map[j - 1][i] {
+                        curr_reached[j - 1][i] |= prev_reached[j][i];
+                    }
+                    if j < width - 1 && map[j + 1][i] {
+                        curr_reached[j + 1][i] |= prev_reached[j][i];
+                    }
+                }
+            }
+            for j in 0..height {
+                for i in 0..width {
+                    if curr_reached[j][i] {
+                        curr_size += 1;
+                    }
+                }
+            }
+            steps += 1;
+            if max_num_steps == usize::MAX && steps % 1 != 0 {
+                continue;
+            }
+            if max_num_steps == usize::MAX && prev_size == curr_size {
+                break;
+            }
+            prev_size = curr_size;
+        }
+        return (steps - 2, curr_size);
+    }
+}
+
 impl Solver for SecondSolver {
+    /// We make the following assumptions:
+    /// 1. The grid is square.
+    /// 2. The start position is right in the middle of the map.
+    /// 2. The horizontal/vertical path from the start position to the edge of
+    /// the map doesn't have obstacles.
+    /// 3. The edges of the map are empty.
+    /// 4. From the start
+    /// Therefore:
+    /// 1. Color the map like a chessboard. If the elf starts from a white tile
+    /// then after an odd number of steps it will be at a black tile and after
+    /// an even number of steps it will be a white tile.
+    /// 2. Because the map is based around the manhattan distance, and because
+    /// the edges and straight paths from the start position are empty, then we
+    /// will enter a copy of the input grid at either the corners or the middles
+    /// of the edges. Furthermore, any path coming in later into the copy of the
+    /// grid will not reach a cell before the path coming in from the corners or
+    /// the middle of te edges, so we only need to consider how the path propagates
+    /// from the start position, corners and middle of edges, depending on where
+    /// the copy of the grid is in the map relative to the starting grid.
+    /// 3. The number of reachable cells is monotonically increasing (separating
+    /// the white tile subsequence from the black tile subsequence), as you can
+    /// always go backwards/forwards to ensure a tile is always reached again after
+    /// N steps.
+    /// 4. The number of steps we need to take is 26501365 which satisfies
+    /// 26501365 mod grid_size == (grid_size - 1) / 2. Also, the number of steps
+    /// is odd, so we only need to find the max number of reachable black tiles
+    /// in the grid. The number of steps to fill a
     fn get_result(map: Vec<Vec<bool>>, start_position: (usize, usize)) -> usize {
         return 0;
     }
