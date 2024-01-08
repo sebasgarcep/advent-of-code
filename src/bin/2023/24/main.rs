@@ -3,8 +3,8 @@ extern crate ndarray;
 extern crate ndarray_linalg;
 
 use lib::reader::read_lines;
-use ndarray::{array, Array, Array1, Array2};
-use ndarray_linalg::{Solve, Determinant};
+use ndarray::{array, s, Array1, Array2};
+use ndarray_linalg::Solve;
 
 pub fn main() {
     first();
@@ -70,6 +70,26 @@ fn second() {
 
 enum SecondSolver {}
 
+impl SecondSolver {
+    /// Positions in matrix correspond to
+    /// p_r_x, p_r_y, p_r_z, v_r_x, v_r_y, v_r_z
+    fn get_system(e: &Entity) -> (Array2<f64>, Array1<f64>) {
+        let a: Array2<f64> = array![
+            [0.0, -e.vz, e.vy, 0.0, e.pz, -e.py],
+            [e.vz, 0.0, -e.vx, -e.pz, 0.0, e.px],
+            [-e.vy, e.vx, 0.0, e.py, -e.px, 0.0],
+        ];
+
+        let b: Array1<f64> = array![
+            e.py * e.vz - e.pz * e.vy,
+            e.pz * e.vx - e.px * e.vz,
+            e.px * e.vy - e.py * e.vx,
+        ];
+
+        return (a, b);
+    }
+}
+
 impl Solver for SecondSolver {
     /// Let:
     /// - N = number of hailstones in the dataset
@@ -85,67 +105,41 @@ impl Solver for SecondSolver {
     /// - x_r(t) = p_r + t * v_r
     /// - x_i(t_i) = x_r(t_i)
     /// Which implies:
-    /// p_r = p_i - t_i * (v_r - v_i)
-    /// Let w_i = t_i * (v_r - v_i).
-    /// Thus: p_r = p_i - w_i
-    /// And because p_r is stable for each i, for every pair i < j we have:
-    /// p_i - w_i = p_j - w_j <-> w_i - w_j = p_i - p_j
-    /// Let's suppose we have N data points. Then we have 3N unknowns and
-    /// 3N(N-1)/2 equations. Thus for the system to be completely determined
-    /// we need at least 7 data points (3N=3N(N-1)/2 <-> N=3). This leads to
-    /// the following system of equations. Suppose we want to express this
-    /// as Ax=B. Then:
-    /// A = (
-    ///   1, -1, 0, ..., 0, 0
-    ///   1, 0, -1, ..., 0, 0
-    ///   ...
-    ///   1, 0, 0, ..., 0, -1
-    ///   0, 1, -1, ..., 0, 0
-    ///   ...
-    ///   0, 0, 0, ..., 1, -1
-    /// )
-    /// [1's and 0's are 3x3 blocks]
-    ///
-    /// x = (
-    ///   w_1
-    ///   ...
-    ///   w_N
-    /// )
-    ///
-    /// B = (
-    ///   p_1 - p_2
-    ///   p_1 - p_3
-    ///   ...
-    ///   p_1 - p_N
-    ///   p_2 - p_3
-    ///   ...
-    ///   p_{N-1} - p_N
-    /// )
+    /// (p_r - p_i) = -t_i * (v_r - v_i)
+    /// Then (p_r - p_i) and (v_r - v_i) are colinear, which imply that
+    /// (p_r - p_i) x (v_r - v_i) = 0
+    /// and if we expand out each term of the resulting vector
+    /// (p_r - p_i)_y * (v_r - v_i)_z - (p_r - p_i)_z * (v_r - v_i)_y = 0
+    /// (p_r - p_i)_z * (v_r - v_i)_x - (p_r - p_i)_x * (v_r - v_i)_z = 0
+    /// (p_r - p_i)_x * (v_r - v_i)_y - (p_r - p_i)_y * (v_r - v_i)_x = 0
+    /// =>
+    /// p_r_y * v_r_z - p_r_y * v_i_z - p_i_y * v_r_z + p_i_y * v_i_z - p_r_z * v_r_y + p_r_z * v_i_y + p_i_z * v_r_y - p_i_z * v_i_y = 0
+    /// p_r_z * v_r_x - p_r_z * v_i_x - p_i_z * v_r_x + p_i_z * v_i_x - p_r_x * v_r_z + p_r_x * v_i_z + p_i_x * v_r_z - p_i_x * v_i_z = 0
+    /// p_r_x * v_r_y - p_r_x * v_i_y - p_i_x * v_r_y + p_i_x * v_i_y - p_r_y * v_r_x + p_r_y * v_i_x + p_i_y * v_r_x - p_i_y * v_i_x = 0
+    /// =>
+    /// -p_r_y * v_i_z - p_i_y * v_r_z + p_i_y * v_i_z + p_r_z * v_i_y + p_i_z * v_r_y - p_i_z * v_i_y = -p_r_y * v_r_z + p_r_z * v_r_y
+    /// -p_r_z * v_i_x - p_i_z * v_r_x + p_i_z * v_i_x + p_r_x * v_i_z + p_i_x * v_r_z - p_i_x * v_i_z = -p_r_z * v_r_x + p_r_x * v_r_z
+    /// -p_r_x * v_i_y - p_i_x * v_r_y + p_i_x * v_i_y + p_r_y * v_i_x + p_i_y * v_r_x - p_i_y * v_i_x = -p_r_x * v_r_y + p_r_y * v_r_x
+    /// Take 3 distinct data points i. Notice that the RHS of these equations are equal for all of these. Therefore we can equate the LHS's
+    /// to obtain a linear system in 6 unknowns and 9 equations. We can make this a square system by dropping 3 equations, and use a linear
+    /// solver to obtain a solution in time. Note that there must exist a choice of 3 data points such that the system has a unique solution,
+    /// otherwise there is no solution to the problem.
     fn get_result(entities: Vec<Entity>) -> i64 {
-        let n = 3;
-        let d = 3;
-        let mut a: Array2<f64> = Array::zeros((d * n * (n - 1) >> 1, d * n));
-        let mut b: Array1<f64> = Array::zeros(d * n * (n - 1) >> 1);
-        let mut pos = 0;
-        for i in 0..(n - 1) {
-            for j in (i + 1)..n {
-                // Set a
-                for s in 0..d {
-                    for t in 0..d {
-                        a[(d * pos + t, d * i + s)] = 1.0;
-                        a[(d * pos + t, d * j + s)] = -1.0;
-                    }
-                }
-                // Set b
-                b[d * pos + 0] = entities[i].px - entities[j].px;
-                b[d * pos + 1] = entities[i].py - entities[j].py;
-                b[d * pos + 2] = entities[i].pz - entities[j].pz;
-                // Increase counter
-                pos += 1;
-            }
-        }
-        println!("d={}", a.det().unwrap());
-        return 0;
+        let i = 0;
+        let j = 1;
+        let k = 2;
+        let (ref a_i, ref b_i) = Self::get_system(&entities[i]);
+        let (ref a_j, ref b_j) = Self::get_system(&entities[j]);
+        let (ref a_k, ref b_k) = Self::get_system(&entities[k]);
+        let mut a: Array2<f64> = Array2::zeros((6, 6));
+        a.slice_mut(s![..3, ..]).assign(&(a_i - a_j));
+        a.slice_mut(s![3.., ..]).assign(&(a_i - a_k));
+        let mut b: Array1<f64> = Array1::zeros(6);
+        b.slice_mut(s![..3]).assign(&(b_j - b_i));
+        b.slice_mut(s![3..]).assign(&(b_k - b_i));
+        let x = a.solve_into(b).unwrap();
+        let result = (x[0].round() as i64) + (x[1].round() as i64) + (x[2].round() as i64);
+        return result;
     }
 }
 
