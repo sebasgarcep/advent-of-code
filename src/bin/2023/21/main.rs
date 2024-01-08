@@ -13,44 +13,26 @@ fn first() {
 
 enum FirstSolver {}
 
-impl Solver for FirstSolver {
-    fn get_num_steps() -> usize {
-        return 64;
+impl FirstSolver {
+    fn clear_counts(counts: &mut Vec<Vec<usize>>) {
+        for j in 0..counts.len() {
+            for i in 0..counts[j].len() {
+                counts[j][i] = 0;
+            }
+        }
     }
 }
 
-fn second() {}
-
-trait Solver {
-    fn get_num_steps() -> usize;
-
-    fn solve() {
-        let line_collection = read_lines("data/2023/21/input.txt");
-
-        /* Indexed map[j][i] */
-        let mut map: Vec<Vec<bool>> = vec![];
-        let mut curr_counts: Vec<Vec<usize>> = vec![];
-        for line in line_collection {
-            let mut map_row = Vec::with_capacity(line.len());
-            let mut curr_counts_row = Vec::with_capacity(line.len());
-            for (i, char) in line.chars().enumerate() {
-                map_row.push(true);
-                curr_counts_row.push(0);
-                match char {
-                    '.' => {}
-                    'S' => curr_counts_row[i] = 1,
-                    '#' => map_row[i] = false,
-                    _ => unreachable!(),
-                };
-            }
-            map.push(map_row);
-            curr_counts.push(curr_counts_row);
-        }
+impl Solver for FirstSolver {
+    fn get_result(map: Vec<Vec<bool>>, start_position: (usize, usize)) -> usize {
         let height = map.len();
         let width = map[0].len();
 
+        let mut curr_counts: Vec<Vec<usize>> = vec![vec![0; width]; height];
+        curr_counts[start_position.1][start_position.0] = 1;
+
         let mut prev_counts = curr_counts.clone();
-        for _ in 0..Self::get_num_steps() {
+        for _ in 0..64 {
             std::mem::swap(&mut prev_counts, &mut curr_counts);
             Self::clear_counts(&mut curr_counts);
 
@@ -72,15 +54,52 @@ trait Solver {
             }
         }
 
-        let result = curr_counts.iter().map(|row| row.iter().sum::<usize>()).sum::<usize>();
+        return curr_counts
+            .iter()
+            .map(|row| row.iter().sum::<usize>())
+            .sum::<usize>();
+    }
+}
+
+fn second() {
+    SecondSolver::solve();
+}
+
+enum SecondSolver {}
+
+impl Solver for SecondSolver {
+    fn get_result(map: Vec<Vec<bool>>, start_position: (usize, usize)) -> usize {
+        return 0;
+    }
+}
+
+trait Solver {
+    fn get_result(map: Vec<Vec<bool>>, start_position: (usize, usize)) -> usize;
+
+    fn solve() {
+        /* Indexed map[j][i] */
+        let (map, start_position) = Self::get_map();
+        let result = Self::get_result(map, start_position);
         println!("{}", result);
     }
 
-    fn clear_counts(counts: &mut Vec<Vec<usize>>) {
-        for j in 0..counts.len() {
-            for i in 0..counts[j].len() {
-                counts[j][i] = 0;
+    fn get_map() -> (Vec<Vec<bool>>, (usize, usize)) {
+        let line_collection = read_lines("data/2023/21/input.txt");
+        let mut start_position = Option::None;
+        let mut map: Vec<Vec<bool>> = vec![];
+        for (j, line) in line_collection.enumerate() {
+            let mut map_row = Vec::with_capacity(line.len());
+            for (i, char) in line.chars().enumerate() {
+                map_row.push(true);
+                match char {
+                    '.' => {}
+                    'S' => start_position = Option::Some((i, j)),
+                    '#' => map_row[i] = false,
+                    _ => unreachable!(),
+                };
             }
+            map.push(map_row);
         }
+        return (map, start_position.unwrap());
     }
 }
