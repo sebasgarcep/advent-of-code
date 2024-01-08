@@ -21,8 +21,6 @@ fn first() {
 struct FirstSolver {
     num_low: usize,
     num_high: usize,
-    memory: Vec<Vec<bool>>,
-    pulse_queue: VecDeque<(usize, usize, bool)>,
 }
 
 impl FirstSolver {
@@ -30,95 +28,81 @@ impl FirstSolver {
         return Self {
             num_low: 0,
             num_high: 0,
-            memory: Vec::new(),
-            pulse_queue: VecDeque::new(),
-        };
-    }
-
-    fn init_memory(&mut self, machine: &Machine) {
-        self.memory = machine
-            .modules
-            .iter()
-            .map(|module| match module.class {
-                ModuleClass::FlipFlop => vec![false],
-                ModuleClass::Conjunction => vec![false; module.sources.len()],
-                _ => Vec::new(),
-            })
-            .collect();
-    }
-
-    fn queue_pulse(&mut self, source: usize, destination: usize, strength: bool) {
-        if strength {
-            self.num_high += 1;
-        } else {
-            self.num_low += 1;
-        }
-        self.pulse_queue.push_back((source, destination, strength));
-    }
-
-    fn get_pulse_strength(
-        &mut self,
-        machine: &Machine,
-        source: usize,
-        destination: usize,
-        input: bool,
-    ) -> Option<bool> {
-        let ref module = machine.modules[destination];
-        let ref mut destination_memory = self.memory[destination];
-        return match module.class {
-            ModuleClass::Broadcast => Option::Some(input),
-            ModuleClass::FlipFlop => {
-                if input {
-                    return Option::None;
-                }
-                destination_memory[0] = !destination_memory[0];
-                return Option::Some(destination_memory[0]);
-            }
-            ModuleClass::Conjunction => {
-                let source_memory_index = module
-                    .sources
-                    .iter()
-                    .find_position(|iter_source| source == **iter_source)
-                    .unwrap().0;
-                destination_memory[source_memory_index] = input;
-                return Option::Some(!destination_memory.iter().all(|x| *x));
-            }
-            _ => Option::None,
         };
     }
 }
 
 impl Solver for FirstSolver {
-    fn get_result(&mut self, machine: Machine) -> usize {
-        self.init_memory(&machine);
+    fn get_result(&mut self, mut machine: Machine) -> usize {
         let button_index = machine.index_map["button"];
         let broadcaster_index = machine.index_map["broadcaster"];
         for _ in 0..1000 {
-            // Press button
-            self.queue_pulse(button_index, broadcaster_index, false);
-            // Process pulses
-            while let Some(pulse) = self.pulse_queue.pop_front() {
-                let (source, destination, input) = pulse;
-                if let Option::Some(output) =
-                    self.get_pulse_strength(&machine, source, destination, input)
-                {
-                    let ref module = machine.modules[destination];
-                    for item in module.destinations.iter() {
-                        self.queue_pulse(destination, *item, output);
-                    }
-                }
-            }
+            self.run_machine(&mut machine, button_index, broadcaster_index);
         }
         return self.num_low * self.num_high;
     }
+
+    fn on_queued_pulse(
+        &mut self,
+        _machine: &Machine,
+        source: usize,
+        destination: usize,
+        strength: bool,
+    ) {
+        if strength {
+            self.num_high += 1;
+        } else {
+            self.num_low += 1;
+        }
+    }
 }
 
-fn second() {}
+struct SecondSolver {}
+
+impl SecondSolver {
+    pub fn new() -> Self {
+        return Self {};
+    }
+}
+
+impl Solver for SecondSolver {
+    fn get_result(&mut self, mut machine: Machine) -> usize {
+        let button_index = machine.index_map["button"];
+        let broadcaster_index = machine.index_map["broadcaster"];
+        let output_module_position = machine.index_map["rx"];
+        let bottleneck_module_position = machine
+            .modules
+            .iter()
+            .find_position(|module| module.destinations.contains(&output_module_position))
+            .unwrap()
+            .0;
+        loop {
+            self.run_machine(&mut machine, button_index, broadcaster_index);
+        }
+        return 0;
+    }
+
+    fn on_queued_pulse(
+        &mut self,
+        machine: &Machine,
+        source: usize,
+        destination: usize,
+        strength: bool,
+    ) {
+        todo!()
+    }
+}
+
+fn second() {
+    let mut solver = SecondSolver::new();
+    solver.solve();
+}
 
 #[derive(Debug)]
 struct Machine {
     modules: Vec<Module>,
     index_map: HashMap<String, usize>,
+    pulse_queue: VecDeque<(usize, usize, bool)>,
 }
 
 #[derive(Debug)]
@@ -133,15 +117,23 @@ enum ModuleClass {
     Noop,
     Button,
     Broadcast,
-    FlipFlop,
-    Conjunction,
+    FlipFlop(bool),
+    Conjunction(Vec<bool>),
 }
 
 trait Solver {
     fn get_result(&mut self, machine: Machine) -> usize;
+    fn on_queued_pulse(
+        &mut self,
+        machine: &Machine,
+        source: usize,
+        destination: usize,
+        strength: bool,
+    );
 
     fn solve(&mut self) {
-        let machine = Self::get_machine();
+        let mut machine = Self::get_machine();
+        Self::init_memory(&mut machine);
         let result = self.get_result(machine);
         println!("{}", result);
     }
@@ -151,6 +143,7 @@ trait Solver {
         let mut machine = Machine {
             modules: vec![],
             index_map: HashMap::new(),
+            pulse_queue: VecDeque::new(),
         };
         Self::add_machine_spec(
             &mut machine,
@@ -220,13 +213,91 @@ trait Solver {
 
         let name = line.split_off(1);
         if line == "%" {
-            return (name, ModuleClass::FlipFlop, destinations);
+            return (name, ModuleClass::FlipFlop(false), destinations);
         }
 
         if line == "&" {
-            return (name, ModuleClass::Conjunction, destinations);
+            return (name, ModuleClass::Conjunction(vec![]), destinations);
         }
 
         unreachable!()
+    }
+
+    fn init_memory(machine: &mut Machine) {
+        for module in machine.modules.iter_mut() {
+            match module.class {
+                ModuleClass::FlipFlop(ref mut state) => {
+                    *state = false;
+                }
+                ModuleClass::Conjunction(ref mut memory) => {
+                    *memory = vec![false; module.sources.len()];
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn get_pulse_strength(
+        machine: &mut Machine,
+        source: usize,
+        destination: usize,
+        input: bool,
+    ) -> Option<bool> {
+        let ref mut module = machine.modules[destination];
+        return match module.class {
+            ModuleClass::Broadcast => Option::Some(input),
+            ModuleClass::FlipFlop(ref mut state) => {
+                if input {
+                    return Option::None;
+                }
+                *state = !*state;
+                return Option::Some(*state);
+            }
+            ModuleClass::Conjunction(ref mut memory) => {
+                let source_memory_index = module
+                    .sources
+                    .iter()
+                    .find_position(|iter_source| source == **iter_source)
+                    .unwrap()
+                    .0;
+                memory[source_memory_index] = input;
+                return Option::Some(!memory.iter().all(|x| *x));
+            }
+            _ => Option::None,
+        };
+    }
+
+    fn run_machine(
+        &mut self,
+        machine: &mut Machine,
+        button_index: usize,
+        broadcaster_index: usize,
+    ) {
+        self.queue_pulse(machine, button_index, broadcaster_index, false);
+        // Process pulses
+        while let Some(pulse) = machine.pulse_queue.pop_front() {
+            let (source, destination, input) = pulse;
+            if let Option::Some(output) =
+                Self::get_pulse_strength(machine, source, destination, input)
+            {
+                for i in 0..machine.modules[destination].destinations.len() {
+                    let item = machine.modules[destination].destinations[i];
+                    self.queue_pulse(machine, destination, item, output);
+                }
+            }
+        }
+    }
+
+    fn queue_pulse(
+        &mut self,
+        machine: &mut Machine,
+        source: usize,
+        destination: usize,
+        strength: bool,
+    ) {
+        machine
+            .pulse_queue
+            .push_back((source, destination, strength));
+        self.on_queued_pulse(machine, source, destination, strength);
     }
 }
