@@ -42,13 +42,7 @@ impl Solver for FirstSolver {
         return self.num_low * self.num_high;
     }
 
-    fn on_queued_pulse(
-        &mut self,
-        _machine: &Machine,
-        source: usize,
-        destination: usize,
-        strength: bool,
-    ) {
+    fn on_queued_pulse(&mut self, _source: usize, _destination: usize, strength: bool) {
         if strength {
             self.num_high += 1;
         } else {
@@ -57,15 +51,25 @@ impl Solver for FirstSolver {
     }
 }
 
-struct SecondSolver {}
+struct SecondSolver {
+    num_iters: usize,
+    num_cycles: usize,
+    cycle_lengths: Vec<usize>,
+}
 
 impl SecondSolver {
     pub fn new() -> Self {
-        return Self {};
+        return Self {
+            num_iters: 0,
+            num_cycles: 0,
+            cycle_lengths: vec![],
+        };
     }
 }
 
 impl Solver for SecondSolver {
+    /// rx is bottlenecked by a conjunction module. We should focus on it and find
+    /// cycles in its input.
     fn get_result(&mut self, mut machine: Machine) -> usize {
         let button_index = machine.index_map["button"];
         let broadcaster_index = machine.index_map["broadcaster"];
@@ -76,20 +80,41 @@ impl Solver for SecondSolver {
             .find_position(|module| module.destinations.contains(&output_module_position))
             .unwrap()
             .0;
-        loop {
+        self.cycle_lengths = machine
+            .modules
+            .iter()
+            .map(|module| {
+                if module.destinations.contains(&bottleneck_module_position) {
+                    usize::MAX
+                } else {
+                    0
+                }
+            })
+            .collect();
+        self.num_cycles = self.cycle_lengths.iter().filter(|c| **c == usize::MAX).count();
+        while self.num_cycles > 0 {
+            self.num_iters += 1;
             self.run_machine(&mut machine, button_index, broadcaster_index);
         }
-        return 0;
+        return self
+            .cycle_lengths
+            .iter()
+            .filter(|c| **c != 0)
+            .fold(usize::MAX, |acc, c| {
+                if acc == usize::MAX {
+                    *c
+                } else {
+                    num::integer::lcm(acc, *c)
+                }
+            });
     }
 
-    fn on_queued_pulse(
-        &mut self,
-        machine: &Machine,
-        source: usize,
-        destination: usize,
-        strength: bool,
-    ) {
-        todo!()
+    fn on_queued_pulse(&mut self, _source: usize, destination: usize, strength: bool) {
+        if strength || self.cycle_lengths[destination] != usize::MAX {
+            return;
+        }
+        self.cycle_lengths[destination] = self.num_iters;
+        self.num_cycles -= 1;
     }
 }
 
@@ -123,13 +148,7 @@ enum ModuleClass {
 
 trait Solver {
     fn get_result(&mut self, machine: Machine) -> usize;
-    fn on_queued_pulse(
-        &mut self,
-        machine: &Machine,
-        source: usize,
-        destination: usize,
-        strength: bool,
-    );
+    fn on_queued_pulse(&mut self, source: usize, destination: usize, strength: bool);
 
     fn solve(&mut self) {
         let mut machine = Self::get_machine();
@@ -298,6 +317,6 @@ trait Solver {
         machine
             .pulse_queue
             .push_back((source, destination, strength));
-        self.on_queued_pulse(machine, source, destination, strength);
+        self.on_queued_pulse(source, destination, strength);
     }
 }
