@@ -68,64 +68,54 @@ fn second() {
 enum SecondSolver {}
 
 impl SecondSolver {
-    fn clear_reached(reached: &mut Vec<Vec<bool>>, width: usize, height: usize) {
-        for j in 0..height {
-            for i in 0..width {
+    fn clear_reached(reached: &mut Vec<Vec<bool>>) {
+        let grid_size: usize = reached.len();
+        for j in 0..grid_size {
+            for i in 0..grid_size {
                 reached[j][i] = false;
             }
         }
     }
 
-    fn calculate_steps(
+    fn count_reached(
         map: &Vec<Vec<bool>>,
-        width: usize,
-        height: usize,
         start_position: (usize, usize),
-        max_num_steps: usize,
-    ) -> (usize, usize) {
-        let mut prev_reached = vec![vec![false; width]; height];
+        num_steps: usize,
+    ) -> usize {
+        let grid_size = map.len();
+        let mut prev_reached = vec![vec![false; grid_size]; grid_size];
         let mut curr_reached = prev_reached.clone();
         curr_reached[start_position.1][start_position.0] = true;
-        let mut prev_size = 0;
-        let mut curr_size = 0;
-        let mut steps = 0;
-        for _ in 0..max_num_steps {
+        for _ in 0..num_steps {
             std::mem::swap(&mut prev_reached, &mut curr_reached);
-            Self::clear_reached(&mut curr_reached, width, height);
-            curr_size = 0;
-            for j in 0..height {
-                for i in 0..width {
+            Self::clear_reached(&mut curr_reached);
+            for j in 0..grid_size {
+                for i in 0..grid_size {
                     if i > 0 && map[j][i - 1] {
                         curr_reached[j][i - 1] |= prev_reached[j][i];
                     }
-                    if i < width - 1 && map[j][i + 1] {
+                    if i < grid_size - 1 && map[j][i + 1] {
                         curr_reached[j][i + 1] |= prev_reached[j][i];
                     }
                     if j > 0 && map[j - 1][i] {
                         curr_reached[j - 1][i] |= prev_reached[j][i];
                     }
-                    if j < width - 1 && map[j + 1][i] {
+                    if j < grid_size - 1 && map[j + 1][i] {
                         curr_reached[j + 1][i] |= prev_reached[j][i];
                     }
                 }
             }
-            for j in 0..height {
-                for i in 0..width {
-                    if curr_reached[j][i] {
-                        curr_size += 1;
-                    }
+        }
+
+        let mut num_reached = 0;
+        for j in 0..grid_size {
+            for i in 0..grid_size {
+                if curr_reached[j][i] {
+                    num_reached += 1;
                 }
             }
-            steps += 1;
-            if max_num_steps == usize::MAX && steps % 1 != 0 {
-                continue;
-            }
-            if max_num_steps == usize::MAX && prev_size == curr_size {
-                break;
-            }
-            prev_size = curr_size;
         }
-        return (steps - 2, curr_size);
+        return num_reached;
     }
 }
 
@@ -133,10 +123,13 @@ impl Solver for SecondSolver {
     /// We make the following assumptions:
     /// 1. The grid is square.
     /// 2. The start position is right in the middle of the map.
-    /// 2. The horizontal/vertical path from the start position to the edge of
+    /// 3. The horizontal/vertical path from the start position to the edge of
     /// the map doesn't have obstacles.
-    /// 3. The edges of the map are empty.
-    /// 4. From the start
+    /// 4. The edges of the map are empty.
+    /// 5. The square is filled in the same amount of steps it takes to reach
+    /// the furthest corner.
+    /// We also make the following unchecked assumptions:
+    /// 1. Any group of unreachable empty spaces in the grid is of size 1.
     /// Therefore:
     /// 1. Color the map like a chessboard. If the elf starts from a white tile
     /// then after an odd number of steps it will be at a black tile and after
@@ -154,11 +147,115 @@ impl Solver for SecondSolver {
     /// always go backwards/forwards to ensure a tile is always reached again after
     /// N steps.
     /// 4. The number of steps we need to take is 26501365 which satisfies
-    /// 26501365 mod grid_size == (grid_size - 1) / 2. Also, the number of steps
-    /// is odd, so we only need to find the max number of reachable black tiles
-    /// in the grid. The number of steps to fill a
+    /// 26501365 mod grid_size == (grid_size - 1) / 2.
     fn get_result(map: Vec<Vec<bool>>, start_position: (usize, usize)) -> usize {
-        return 0;
+        let width = map[0].len();
+        let height = map.len();
+
+        // First assumption
+        assert!(width == height);
+        let grid_size = width;
+
+        // Second assumption
+        assert!(start_position == (grid_size >> 1, grid_size >> 1));
+
+        // Third assumption
+        for p in 0..grid_size {
+            assert!(map[start_position.1][p]);
+            assert!(map[p][start_position.0]);
+        }
+
+        // Fourth assumption
+        for p in 0..grid_size {
+            assert!(map[0][p]);
+            assert!(map[p][0]);
+            assert!(map[grid_size - 1][p]);
+            assert!(map[p][grid_size - 1]);
+        }
+
+        // Fifth assumption
+        let mut num_tiles: Vec<usize> = vec![0, 0];
+        for i in 0..grid_size {
+            for j in 0..grid_size {
+                if map[j][i]
+                    && (j == 0
+                        || map[j - 1][i]
+                        || j == grid_size - 1
+                        || map[j + 1][i]
+                        || i == 0
+                        || map[j][i - 1]
+                        || i == grid_size - 1
+                        || map[j][i + 1])
+                {
+                    num_tiles[(i + j) & 1] += 1;
+                }
+            }
+        }
+        let full_size = grid_size - 1;
+        let half_size = grid_size >> 1;
+
+        let checks = vec![
+            (start_position, full_size),
+            ((0, 0), 2 * full_size),
+            ((0, grid_size - 1), 2 * full_size),
+            ((grid_size - 1, 0), 2 * full_size),
+            ((grid_size - 1, grid_size - 1), 2 * full_size),
+            ((0, grid_size >> 1), 2 * full_size + half_size),
+            ((grid_size >> 1, 0), 2 * full_size + half_size),
+            ((grid_size - 1, grid_size >> 1), 2 * full_size + half_size),
+            ((grid_size >> 1, grid_size - 1), 2 * full_size + half_size),
+        ];
+        for (position, steps) in checks {
+            assert!(Self::count_reached(&map, position, steps) == num_tiles[0]);
+            assert!(Self::count_reached(&map, position, steps - 1) == num_tiles[1]);
+        }
+
+        // Solve the problem now
+        let num_steps: usize = 26501365;
+        let num_jumps: usize = num_steps / grid_size;
+
+        // The reachable area is a rhombus with full squares in the middle, corners,
+        // and the edges are composed of smaller and bigger triangles.
+        let small_triangles = [
+            Self::count_reached(&map, (0, 0), half_size - 1),
+            Self::count_reached(&map, (grid_size - 1, 0), half_size - 1),
+            Self::count_reached(&map, (0, grid_size - 1), half_size - 1),
+            Self::count_reached(&map, (grid_size - 1, grid_size - 1), half_size - 1),
+        ];
+
+        let big_triangles = [
+            Self::count_reached(&map, (0, 0), full_size + half_size),
+            Self::count_reached(&map, (grid_size - 1, 0), full_size + half_size),
+            Self::count_reached(&map, (0, grid_size - 1), full_size + half_size),
+            Self::count_reached(&map, (grid_size - 1, grid_size - 1), full_size + half_size),
+        ];
+
+        let corners = [
+            Self::count_reached(&map, (grid_size >> 1, 0), full_size),
+            Self::count_reached(&map, (0, grid_size >> 1), full_size),
+            Self::count_reached(&map, (grid_size - 1, grid_size >> 1), full_size),
+            Self::count_reached(&map, (grid_size >> 1, grid_size - 1), full_size),
+        ];
+
+        // The number of steps is odd, so the parity of the center square will be odd.
+        let mut counts = vec![0, 1];
+        for idx in 0..num_jumps {
+            // The size of each ring is 4 * (how far it is from the center square)
+            counts[(idx + 1) & 1] += 4 * idx;
+        }
+
+        return num_tiles
+            .iter()
+            .zip(counts.iter())
+            .map(|(nt, ct)| nt * ct)
+            .sum::<usize>()
+            // There is a small triangle in between each pair of big triangle or
+            // between a pair with a big triangle and a corner. Therefore there
+            // must be one more small triangle than a big triangle.
+            + (num_jumps - 1) * big_triangles.iter().sum::<usize>()
+            + num_jumps * small_triangles.iter().sum::<usize>()
+            // Just 4 corners
+            + corners.iter().sum::<usize>();
     }
 }
 
